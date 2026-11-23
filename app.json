@@ -15,10 +15,20 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "package": "com.sergioestrada555.FISIOKIDS"
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-sqlite",
+      "expo-font"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "992a3be4-6448-4c6c-834e-0b726bc1c09f"
+      }
     }
   }
 }
