@@ -89,21 +89,22 @@ FISIOKIDS/
 
 ## Descargar la APK
 
-[Descargar FisioKids 1.0.0 (APK)](https://expo.dev/accounts/sergioestrada555/projects/FISIOKIDS/builds/1bf4728f-5982-4799-a91c-3f33ca1839f1)
+[Descargar FisioKids 1.0.0 (APK)](https://github.com/SergioIgnacioEstradaSimons/FisioKids/releases/download/v1.0.0/FisioKids-1.0.0.apk)
 
 - **Versión:** 1.0.0
-- **SHA-256:** `PEGAR_AQUI_EL_HASH`
+- **Tamaño:** 103 MB
+- **SHA-256:** `d9211c04b866d17e23ffa6a170565adb52baf35b8247ce73f40a5990975ab4d7`
 
 Para verificar la descarga:
 - Windows: `certutil -hashfile app.apk SHA256`
 - Linux/Mac: `sha256sum app.apk`
 
 ## Video demo
-en trabajo
+
 [Ver el video de demostración](ENLACE_DE_YOUTUBE)
 
 ## Autor
 
-- Sergio Ignacio Estrada Simóns
+- Sergio Ignacio Estrada Simóns · [Repositorio en GitHub](https://github.com/SergioIgnacioEstradaSimons/FisioKids)
 
 Docente: Ing. Juan Huanto Villca · Aplicaciones Móviles I · Tarija, 2026.
