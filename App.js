@@ -48,6 +48,7 @@ import ConfigurarMesScreen from './screens/ConfigurarMesScreen';
 import RevisionMesScreen from './screens/RevisionMesScreen';
 import ResumenPeriodoScreen from './screens/ResumenPeriodoScreen';
 import SesionesHoyScreen from './screens/SesionesHoyScreen';
+import TiposDiscapacidadScreen from './screens/TiposDiscapacidadScreen';
 import FormularioSuspensionScreen from './screens/FormularioSuspensionScreen';
 import EditarPerfilScreen from './screens/EditarPerfilScreen';
 import FormularioProfesionalScreen from './screens/FormularioProfesionalScreen';
@@ -88,6 +89,7 @@ function DrawerAdmin() {
       <Drawer.Screen name="Tabs" component={TabsAdmin} />
       <Drawer.Screen name="Profesionales" component={ProfesionalesScreen} options={conCabecera('Profesionales')} />
       <Drawer.Screen name="Salas" component={SalasScreen} options={conCabecera('Salas')} />
+      <Drawer.Screen name="Tipos" component={TiposDiscapacidadScreen} options={conCabecera('Tipos de discapacidad')} />
       <Drawer.Screen name="Suspensiones" component={FeriadosScreen} options={conCabecera('Suspensiones')} />
       <Drawer.Screen name="Historial" component={HistorialSesionesScreen} options={conCabecera('Historial de sesiones')} />
       <Drawer.Screen name="Notificaciones" component={NotificacionesScreen} options={conCabecera('Notificaciones')} />
@@ -152,7 +154,7 @@ export default function App() {
           <Stack.Screen name="NuevaAsignacion" component={NuevaAsignacionScreen} options={{ title: 'Nueva asignación' }} />
           <Stack.Screen name="ConfigurarMes" component={ConfigurarMesScreen} options={{ title: 'Configurar mes' }} />
           <Stack.Screen name="ResumenPeriodo" component={ResumenPeriodoScreen} options={({ route }) => ({ title: `Resumen de ${route.params?.mes ?? 'periodo'}` })} />
-          <Stack.Screen name="SesionesHoy" component={SesionesHoyScreen} options={{ title: 'Sesiones de hoy' }} />
+          <Stack.Screen name="SesionesHoy" component={SesionesHoyScreen} options={({ route }) => ({ title: route.params?.fecha ? `Sesiones del ${route.params.fecha.split('-').reverse().slice(0, 2).join('/')}` : 'Sesiones de hoy' })} />
           <Stack.Screen name="EditarPerfil" component={EditarPerfilScreen} options={{ title: 'Editar perfil' }} />
           <Stack.Screen name="FormularioSuspension" component={FormularioSuspensionScreen} options={{ title: 'Nueva suspensión' }} />
           <Stack.Screen name="RegistrarAtencion" component={RegistrarAtencionScreen} options={{ title: 'Registrar atención' }} />

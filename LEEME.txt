@@ -1,0 +1,4 @@
+FisioKids - Proyecto final (Aplicaciones Moviles I)
+1) npm install   2) npx expo install expo-linear-gradient expo-font react-native-svg @expo/vector-icons @expo-google-fonts/plus-jakarta-sans expo-sqlite expo-crypto expo-image-picker   3) npx expo start
+Usuarios de prueba: admin@fisiokids.bo / admin123  y  carmen@fisiokids.bo / prof123
+Si cambias las tablas: borra los datos de Expo Go (o desinstala la app) para que se cree la base de nuevo.

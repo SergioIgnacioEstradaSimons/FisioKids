@@ -3,7 +3,7 @@ import { Feather } from '@expo/vector-icons';
 import Texto from '../components/Texto';
 import Boton from '../components/Boton';
 import Insignia from '../components/Insignia';
-import { iniciales } from '../components/TarjetaNino';
+import Avatar from '../components/Avatar';
 import { colores, tarjeta } from '../tema';
 import { useSesion, irALogin } from '../sesion';
 
@@ -43,7 +43,7 @@ export default function PerfilScreen({ navigation }) {
     <ScrollView style={{ backgroundColor: colores.fondo }} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
       <View style={{ alignItems: 'center', marginVertical: 10 }}>
         <TouchableOpacity onPress={() => navigation.navigate('EditarPerfil')} activeOpacity={0.85}>
-          <View style={estilos.avatar}><Texto style={estilos.iniciales}>{iniciales(usuario?.nombre)}</Texto></View>
+          <Avatar foto={usuario?.foto} nombre={usuario?.nombre} tam={84} radio={26} />
           <View style={estilos.editar}><Feather name="edit-2" size={13} color="#fff" /></View>
         </TouchableOpacity>
         <Texto style={estilos.nombre}>{usuario?.nombre}</Texto>

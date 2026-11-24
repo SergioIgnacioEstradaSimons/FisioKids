@@ -1,20 +1,49 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
+import { useSQLiteContext } from 'expo-sqlite';
 import Texto from '../components/Texto';
+import Estado from '../components/Estado';
 import { colores, tarjeta } from '../tema';
-import { notificacionesEjemplo } from '../semilla';
+import { useSesion, notificarAvisos } from '../sesion';
+import { useConsulta } from '../hooks';
+import { obtenerAvisos, obtenerClavesLeidas, marcarAvisoLeido, marcarAvisosLeidos } from '../datos';
+import { hoyISO, horaActual } from '../utiles';
 
 const TINTES = {
   azul: [colores.azulClaro, colores.azul], verde: [colores.verdeClaro, colores.exito],
   naranja: [colores.naranjaClaro, colores.alerta], morado: [colores.moradoClaro, colores.morado],
 };
 
-// Solo pantalla de ejemplo: las notificaciones push quedan fuera del alcance del proyecto final.
-export default function NotificacionesScreen() {
-  const [lista, setLista] = useState(notificacionesEjemplo);
+// Avisos del centro, calculados con los datos reales: cada bloque cuyo horario ya pasó aparece como aviso
+// (pendiente de cerrar o finalizado) y también las suspensiones próximas. El profesional ve solo sus bloques.
+export default function NotificacionesScreen({ navigation }) {
+  const db = useSQLiteContext();
+  const { usuario } = useSesion();
   const [pestana, setPestana] = useState('todas');
-  const visibles = lista.filter((n) => pestana === 'todas' || !n.leida);
+  const { datos, cargando, error, recargar } = useConsulta(async (d) => ({
+    avisos: await obtenerAvisos(d, usuario, hoyISO(), horaActual()),
+    leidas: await obtenerClavesLeidas(d, usuario.id),
+  }), [usuario?.id]);
+
+  // se actualiza sola cada 30 segundos mientras la pantalla está abierta
+  useEffect(() => { const t = setInterval(recargar, 30000); return () => clearInterval(t); }, [recargar]);
+
+  if (!datos) return <Estado cargando={cargando} error={error} recargar={recargar} />;
+  const { avisos, leidas } = datos;
+  const visibles = avisos.filter((a) => pestana === 'todas' || !leidas.has(a.clave));
+
+  const abrir = async (a) => {
+    await marcarAvisoLeido(db, usuario.id, a.clave);
+    notificarAvisos();
+    recargar();
+    if (a.bloqueId) navigation.navigate(usuario.rol === 'admin' ? 'SesionesHoy' : 'AsistenciaBloque', { bloqueId: a.bloqueId });
+  };
+  const marcarTodas = async () => {
+    await marcarAvisosLeidos(db, usuario.id, avisos.map((a) => a.clave));
+    notificarAvisos();
+    recargar();
+  };
 
   return (
     <ScrollView style={{ backgroundColor: colores.fondo }} contentContainerStyle={{ padding: 16 }}>
@@ -26,10 +55,10 @@ export default function NotificacionesScreen() {
             </TouchableOpacity>
           ))}
         </View>
-        <TouchableOpacity onPress={() => setLista(lista.map((n) => ({ ...n, leida: true })))}><Texto style={estilos.marcar}>Marcar leídas</Texto></TouchableOpacity>
+        <TouchableOpacity onPress={marcarTodas}><Texto style={estilos.marcar}>Marcar leídas</Texto></TouchableOpacity>
       </View>
 
-      {['Hoy', 'Ayer'].map((g) => {
+      {['Hoy', 'Próximos días'].map((g) => {
         const items = visibles.filter((n) => n.grupo === g);
         if (items.length === 0) return null;
         return (
@@ -38,16 +67,16 @@ export default function NotificacionesScreen() {
             <View style={estilos.bloque}>
               {items.map((n, i) => {
                 const [fondo, color] = TINTES[n.tinte];
+                const leida = leidas.has(n.clave);
                 return (
-                  <TouchableOpacity key={n.id} activeOpacity={0.8} style={[estilos.item, i > 0 && estilos.separador]}
-                    onPress={() => setLista(lista.map((x) => (x.id === n.id ? { ...x, leida: true } : x)))}>
+                  <TouchableOpacity key={n.clave} activeOpacity={0.8} style={[estilos.item, i > 0 && estilos.separador]} onPress={() => abrir(n)}>
                     <View style={[estilos.icono, { backgroundColor: fondo }]}><Feather name={n.icono} size={17} color={color} /></View>
                     <View style={{ flex: 1 }}>
                       <Texto style={estilos.titulo}>{n.titulo}</Texto>
                       <Texto style={estilos.texto}>{n.texto}</Texto>
                       <Texto style={estilos.hace}>{n.hace}</Texto>
                     </View>
-                    {!n.leida ? <View style={estilos.punto} /> : null}
+                    {!leida ? <View style={estilos.punto} /> : null}
                   </TouchableOpacity>
                 );
               })}
@@ -55,7 +84,12 @@ export default function NotificacionesScreen() {
           </View>
         );
       })}
-      {visibles.length === 0 ? <Texto style={estilos.vacio}>No tienes notificaciones sin leer.</Texto> : null}
+      {visibles.length === 0 ? (
+        <View style={{ alignItems: 'center', marginTop: 40 }}>
+          <Feather name="bell-off" size={30} color={colores.textoSuave} />
+          <Texto style={estilos.vacio}>{pestana === 'todas' ? 'Todavía no hay avisos. Aparecerán cuando pase el horario de un bloque.' : 'No tienes avisos sin leer.'}</Texto>
+        </View>
+      ) : null}
     </ScrollView>
   );
 }
@@ -76,5 +110,5 @@ const estilos = StyleSheet.create({
   texto: { fontSize: 11, color: colores.textoSuave, marginTop: 2 },
   hace: { fontSize: 10, color: '#9AA9BC', marginTop: 4 },
   punto: { width: 8, height: 8, borderRadius: 4, backgroundColor: colores.azul, marginTop: 4 },
-  vacio: { textAlign: 'center', color: colores.textoSuave, marginTop: 30 },
+  vacio: { textAlign: 'center', color: colores.textoSuave, marginTop: 12, paddingHorizontal: 20 },
 });

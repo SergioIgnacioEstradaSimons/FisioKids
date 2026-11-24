@@ -4,7 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import Texto from '../components/Texto';
 import Anillo from '../components/Anillo';
 import Estado from '../components/Estado';
-import { iniciales } from '../components/TarjetaNino';
+import Avatar from '../components/Avatar';
 import { colores, degradadoTarjeta, tarjeta } from '../tema';
 import { useSesion } from '../sesion';
 import { useConsulta } from '../hooks';
@@ -38,7 +38,7 @@ export default function InicioAdminScreen({ navigation }) {
     const ahora = horaActual();
     const suspension = await obtenerSuspensionDeFecha(db, hoyISO()); // feriado o día sin atención guardado en SQLite
     const totales = await contarTotales(db);
-    const dia = await resumenDelDia(db, hoy, hoyISO(), ahora);
+    const dia = await resumenDelDia(db, hoy, hoyISO());
     // Próximas sesiones: las de hoy que todavía no terminaron
     const bloques = hoy && !suspension ? (await obtenerBloques(db, hoy)).filter((b) => b.hora_fin > ahora).slice(0, 3) : [];
     const conNino = await Promise.all(bloques.map(async (b) => ({ ...b, primero: (await obtenerNinosDeBloque(db, b.id))[0] })));
@@ -47,8 +47,9 @@ export default function InicioAdminScreen({ navigation }) {
 
   const t = datos?.totales;
   const d = datos?.dia;
-  const sinRegistrar = d ? Math.max(d.dadas - d.presentes - d.faltas, 0) : 0;
-  const porcentaje = d && d.programadas ? Math.round((d.dadas / d.programadas) * 100) : 0;
+  // El porcentaje sale de las asistencias realmente registradas, no de la hora del día
+  const sinRegistrar = d ? Math.max(d.programadas - d.registradas, 0) : 0;
+  const porcentaje = d && d.programadas ? Math.round((d.registradas / d.programadas) * 100) : 0;
 
   return (
     <ScrollView style={{ backgroundColor: colores.fondo }} contentContainerStyle={estilos.contenido}>
@@ -58,7 +59,7 @@ export default function InicioAdminScreen({ navigation }) {
           <Texto style={estilos.saludo}>{saludo()}, {usuario?.nombre?.split(' ')[0]}</Texto>
           <Texto style={estilos.sub}>Todo está listo para hoy.</Texto>
         </View>
-        <View style={estilos.iniciales}><Texto style={{ color: colores.azul, fontWeight: '700' }}>{iniciales(usuario?.nombre)}</Texto></View>
+        <Avatar foto={usuario?.foto} nombre={usuario?.nombre} tam={44} radio={14} />
       </View>
 
       <Estado cargando={cargando && !datos} error={error} recargar={recargar} />
@@ -78,7 +79,7 @@ export default function InicioAdminScreen({ navigation }) {
                 <Texto style={estilos.asistenciaEtiqueta}>RESUMEN DEL DÍA</Texto>
                 {hoy && !datos.suspension ? (
                   <>
-                    <Texto style={estilos.asistenciaValor}>{d.dadas} de {d.programadas} sesiones dadas</Texto>
+                    <Texto style={estilos.asistenciaValor}>{d.registradas} de {d.programadas} asistencias registradas</Texto>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 8 }}>
                       <Texto style={estilos.leyenda}><Texto style={{ color: colores.menta }}>● </Texto>{d.presentes} presentes</Texto>
                       <Texto style={[estilos.leyenda, { marginLeft: 12 }]}><Texto style={{ color: '#F6B26B' }}>● </Texto>{d.faltas} faltas</Texto>

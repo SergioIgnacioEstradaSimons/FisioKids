@@ -7,6 +7,7 @@ import Estado from '../components/Estado';
 import Fab from '../components/Fab';
 import { useConsulta } from '../hooks';
 import AvisoSuspension from '../components/AvisoSuspension';
+import CalendarioMes from '../components/CalendarioMes';
 import { obtenerBloques, obtenerSuspensionDeFecha } from '../datos';
 import { diaDeHoy, MESES, TURNOS, turnoDe, horaActual, mayuscula, aISO } from '../utiles';
 
@@ -24,6 +25,7 @@ export default function HorariosScreen({ navigation }) {
   const [lunes, setLunes] = useState(lunesDe(new Date()));
   const [dia, setDia] = useState(diaDeHoy());
   const [turno, setTurno] = useState(turnoDe(horaActual())); // Mañana 8-12, Tarde 14-19
+  const [vista, setVista] = useState('Semana'); // 'Semana' | 'Mes'
 
   const fechas = [0, 1, 2, 3, 4].map((i) => { const f = new Date(lunes); f.setDate(f.getDate() + i); return f; });
   const mover = (dias) => { const l = new Date(lunes); l.setDate(l.getDate() + dias); setLunes(l); };
@@ -36,6 +38,16 @@ export default function HorariosScreen({ navigation }) {
   return (
     <View style={{ flex: 1, backgroundColor: colores.fondo }}>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 100 }}>
+        <View style={estilos.vistas}>
+          {['Semana', 'Mes'].map((v) => (
+            <TouchableOpacity key={v} style={[estilos.vista, vista === v && estilos.vistaActiva]} onPress={() => setVista(v)} activeOpacity={0.8}>
+              <Feather name={v === 'Semana' ? 'columns' : 'calendar'} size={14} color={vista === v ? colores.azul : colores.textoSuave} />
+              <Texto style={[estilos.vistaTexto, vista === v && { color: colores.azul }]}>{v}</Texto>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {vista === 'Mes' ? <CalendarioMes navigation={navigation} /> : (
+        <>
         <View style={estilos.semanaFila}>
           <TouchableOpacity style={estilos.flecha} onPress={() => mover(-7)}><Feather name="chevron-left" size={18} color={colores.texto} /></TouchableOpacity>
           <View style={{ alignItems: 'center' }}>
@@ -103,6 +115,8 @@ export default function HorariosScreen({ navigation }) {
             </View>
           );
         }) : null}
+        </>
+        )}
       </ScrollView>
 
       <Fab texto="Crear asignación" onPress={() => navigation.navigate('NuevaAsignacion', { dia, hora: TURNOS[turno][0] })} />
@@ -120,6 +134,10 @@ const estilos = StyleSheet.create({
   diaActivo: { backgroundColor: colores.azul },
   diaNombre: { fontSize: 9, fontWeight: '700', color: colores.textoSuave },
   diaNum: { fontSize: 18, fontWeight: '800', color: colores.marino, marginTop: 2 },
+  vistas: { flexDirection: 'row', backgroundColor: '#E6EDF5', borderRadius: 12, padding: 3, marginBottom: 14 },
+  vista: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 9, borderRadius: 10 },
+  vistaActiva: { backgroundColor: '#fff' },
+  vistaTexto: { fontSize: 13, fontWeight: '700', color: colores.textoSuave },
   turnos: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   turno: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: colores.borde },
   turnoActivo: { backgroundColor: colores.azulClaro, borderColor: '#B9D4F7' },

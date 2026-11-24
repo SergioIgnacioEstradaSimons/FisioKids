@@ -4,6 +4,7 @@ import { Feather } from '@expo/vector-icons';
 import Texto from '../components/Texto';
 import Insignia from '../components/Insignia';
 import Estado from '../components/Estado';
+import Avatar from '../components/Avatar';
 import { iniciales } from '../components/TarjetaNino';
 import { colores, degradadoTarjeta, tarjeta } from '../tema';
 import { useSesion } from '../sesion';
@@ -38,7 +39,7 @@ export default function InicioScreen({ navigation }) {
           <Texto style={estilos.saludo}>Hola, {usuario?.nombres?.split(' ')[0] ?? usuario?.nombre?.split(' ')[0]}</Texto>
           <Texto style={estilos.sub}>{usuario?.especialidad}</Texto>
         </View>
-        <View style={estilos.iniciales}><Texto style={{ color: colores.azul, fontWeight: '700' }}>{iniciales(usuario?.nombre)}</Texto></View>
+        <Avatar foto={usuario?.foto} nombre={usuario?.nombre} tam={46} radio={14} />
       </View>
 
       <Estado cargando={cargando && !datos} error={error} recargar={recargar} />

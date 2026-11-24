@@ -5,12 +5,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Texto from './Texto';
 import { colores, sombra } from '../tema';
 import { useSesion } from '../sesion';
+import { useAvisosSinLeer } from '../hooks';
 
 // Encabezado del diseño: botón (menú o atrás) – título centrado – campana
 export default function Cabecera({ titulo, navigation, menu }) {
   const insets = useSafeAreaInsets();
   const { usuario } = useSesion();
   const esAdmin = usuario?.rol === 'admin';
+  const sinLeer = useAvisosSinLeer(usuario);
   const puedeVolver = navigation.canGoBack();
 
   return (
@@ -31,7 +33,7 @@ export default function Cabecera({ titulo, navigation, menu }) {
         {usuario ? (
           <TouchableOpacity style={estilos.boton} onPress={() => navigation.navigate('Principal', esAdmin ? { screen: 'Notificaciones' } : { screen: 'Tabs', params: { screen: 'Notificaciones' } })}>
             <Feather name="bell" size={19} color={colores.texto} />
-            <View style={estilos.punto} />
+            {sinLeer > 0 ? <View style={estilos.punto} /> : null}
           </TouchableOpacity>
         ) : null}
       </View>

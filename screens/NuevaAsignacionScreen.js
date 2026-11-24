@@ -37,7 +37,7 @@ export default function NuevaAsignacionScreen({ navigation, route }) {
   const [agregando, setAgregando] = useState(false);
   const [profId, setProfId] = useState(null);
   const [salaId, setSalaId] = useState(null);
-  const [dia, setDia] = useState(route.params?.dia ?? 1);
+  const [dias, setDias] = useState([route.params?.dia ?? 1]); // días de la semana en que se repite (cada semana del mes)
   const [hora, setHora] = useState(route.params?.hora ?? '09:00');
   const turno = turnoDe(hora);
   const cambiarTurno = (t) => { if (t !== turno) setHora(TURNOS[t][0]); };
@@ -50,29 +50,35 @@ export default function NuevaAsignacionScreen({ navigation, route }) {
     profes: (await obtenerProfesionales(d, 0)).filter((p) => p.activo),
     salas: (await obtenerSalas(d)).filter((s) => s.activo),
   }));
-  // Disponibilidad del horario elegido
-  const slot = useConsulta(async (d) => {
+  // Disponibilidad del horario elegido, revisada en CADA día seleccionado
+  const slot = useConsulta(async (d) => Promise.all(dias.map(async (dia) => {
     const bloques = await obtenerBloquesEnHorario(d, dia, hora);
     const delSala = bloques.find((b) => b.sala_id === salaId);
-    return { bloques, delSala, ninos: delSala ? await obtenerNinosDeBloque(d, delSala.id) : [] };
-  }, [dia, hora, salaId]);
+    return { dia, bloques, delSala, ninos: delSala ? await obtenerNinosDeBloque(d, delSala.id) : [] };
+  })), [dias.join(','), hora, salaId]);
 
   if (!listas.datos) return <Estado cargando={listas.cargando} error={listas.error} recargar={listas.recargar} />;
   const { ninos, profes, salas } = listas.datos;
-  const bloques = slot.datos?.bloques ?? [];
-  const delSala = slot.datos?.delSala;
-  const ninosEnBloque = slot.datos?.ninos ?? [];
+  const porDia = slot.datos ?? [];
+  const ninosEnBloque = [...new Map(porDia.flatMap((x) => x.ninos).map((n) => [n.id, n])).values()]; // niños ya asignados en alguno de los días
+  const ocupados = Math.max(0, ...porDia.map((x) => x.ninos.length));                                   // el día más lleno manda
+  const delSala = porDia.find((x) => x.delSala)?.delSala;
+  const todosTienenBloque = porDia.length > 0 && porDia.every((x) => x.delSala);
   const sala = salas.find((s) => s.id === salaId);
   const max = Math.min(4, sala?.capacidad ?? 4);
+  const nombresDias = (lista) => lista.map((d) => NOMBRES_DIA[d].toLowerCase()).join(', ');
 
-  const conflictoProf = !!profId && bloques.some((b) => b.profesional_id === profId && b.sala_id !== salaId);
-  const conflictoSala = !!salaId && !!profId && !!delSala && delSala.profesional_id !== profId;
-  const cupoLleno = ninosEnBloque.length >= max;
-  const yaAsignados = ninoIds.filter((id) => ninosEnBloque.some((n) => n.id === id));
+  const diasConflictoProf = profId ? porDia.filter((x) => x.bloques.some((b) => b.profesional_id === profId && b.sala_id !== salaId)).map((x) => x.dia) : [];
+  const diasConflictoSala = salaId && profId ? porDia.filter((x) => x.delSala && x.delSala.profesional_id !== profId).map((x) => x.dia) : [];
+  const conflictoProf = diasConflictoProf.length > 0;
+  const conflictoSala = diasConflictoSala.length > 0;
+  const cupoLleno = ocupados >= max;
+  const yaAsignados = ninoIds.filter((id) => porDia.some((x) => x.ninos.some((n) => n.id === id)));
   const yaAsignado = yaAsignados.length > 0;
-  const espacios = Math.max(max - ninosEnBloque.length, 0);         // lugares libres en el bloque
-  const restantes = espacios - ninoIds.length;                        // lugares que quedan después de lo seleccionado
+  const espacios = Math.max(max - ocupados, 0);         // lugares libres en el bloque (en el día más lleno)
+  const restantes = espacios - ninoIds.length;           // lugares que quedan después de lo seleccionado
   const excedido = ninoIds.length > espacios;
+  const alternarDia = (d) => setDias(dias.includes(d) ? (dias.length > 1 ? dias.filter((x) => x !== d) : dias) : [...dias, d].sort());
   const seleccionados = ninoIds.map((id) => ninos.find((n) => n.id === id)).filter(Boolean);
   const disponibles = ninos.filter((n) => !ninoIds.includes(n.id) && !ninosEnBloque.some((b) => b.id === n.id));
 
@@ -84,8 +90,8 @@ export default function NuevaAsignacionScreen({ navigation, route }) {
     setErrores(e);
     if (Object.keys(e).length) return;
     try {
-      await crearAsignacion(db, { ninoIds, profesionalId: profId, salaId, dia, hora, actividad: delSala?.actividad ?? actividad });
-      Alert.alert('Asignación guardada', ninoIds.length === 1 ? 'El niño quedó asignado al bloque.' : `Los ${ninoIds.length} niños quedaron asignados al bloque.`, [{ text: 'Aceptar', onPress: () => navigation.goBack() }]);
+      await crearAsignacion(db, { ninoIds, profesionalId: profId, salaId, dias, hora, actividad: delSala?.actividad ?? actividad });
+      Alert.alert('Asignación guardada', `${ninoIds.length === 1 ? 'El niño quedó asignado' : `Los ${ninoIds.length} niños quedaron asignados`} y se repetirá todos los ${nombresDias(dias)} del mes.`, [{ text: 'Aceptar', onPress: () => navigation.goBack() }]);
     } catch (err) {
       Alert.alert('No se pudo asignar', err.message); // las reglas de negocio se validan en datos.js
     }
@@ -100,7 +106,7 @@ export default function NuevaAsignacionScreen({ navigation, route }) {
             <Texto style={estilos.capacidadTitulo}>Capacidad del bloque</Texto>
             <Texto style={estilos.capacidadSub}>Máximo {max} niños por horario</Texto>
           </View>
-          <Texto style={[estilos.capacidadValor, (cupoLleno || excedido) && { color: colores.error }]}>{ninosEnBloque.length + ninoIds.length}/{max}</Texto>
+          <Texto style={[estilos.capacidadValor, (cupoLleno || excedido) && { color: colores.error }]}>{ocupados + ninoIds.length}/{max}</Texto>
         </View>
 
         <View style={{ marginBottom: 14 }}>
@@ -129,13 +135,29 @@ export default function NuevaAsignacionScreen({ navigation, route }) {
           opciones={profes.map((p) => ({ valor: p.id, etiqueta: p.nombre }))} />
         <Selector etiqueta="Sala" obligatorio valor={salaId} onChange={setSalaId} error={errores.sala} placeholder="Seleccionar sala"
           opciones={salas.map((s) => ({ valor: s.id, etiqueta: s.nombre }))} />
-        <Selector etiqueta="Día" valor={dia} onChange={setDia} opciones={[1, 2, 3, 4, 5].map((d) => ({ valor: d, etiqueta: NOMBRES_DIA[d] }))} />
+        <View style={{ marginBottom: 14 }}>
+          <Texto style={estilos.etiqueta}>Se repite los días</Texto>
+          <View style={estilos.diasFila}>
+            {[1, 2, 3, 4, 5].map((d) => {
+              const activo = dias.includes(d);
+              return (
+                <TouchableOpacity key={d} style={[estilos.diaChip, activo && estilos.diaChipActivo]} onPress={() => alternarDia(d)} activeOpacity={0.8}>
+                  <Texto style={[estilos.diaChipTexto, activo && { color: '#fff' }]}>{NOMBRES_DIA[d].slice(0, 3)}</Texto>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <View style={estilos.repite}>
+            <Feather name="repeat" size={13} color={colores.azul} />
+            <Texto style={estilos.repiteTexto}>Se repite todos los {nombresDias(dias)} de cada mes.</Texto>
+          </View>
+        </View>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <Selector estiloContenedor={{ flex: 1 }} etiqueta="Turno" valor={turno} onChange={cambiarTurno}
             opciones={[{ valor: 'Mañana', etiqueta: 'Mañana (8:00 a 12:00)' }, { valor: 'Tarde', etiqueta: 'Tarde (14:00 a 19:00)' }]} />
           <Selector estiloContenedor={{ flex: 1 }} etiqueta="Hora de inicio" valor={hora} onChange={setHora} opciones={TURNOS[turno].map((h) => ({ valor: h, etiqueta: h }))} />
         </View>
-        {delSala ? (
+        {todosTienenBloque ? (
           <View style={{ marginBottom: 14 }}>
             <Texto style={estilos.etiqueta}>Actividad</Texto>
             <View style={estilos.turno}><Texto style={estilos.turnoTexto}>{delSala.actividad} (bloque existente)</Texto></View>
@@ -146,9 +168,9 @@ export default function NuevaAsignacionScreen({ navigation, route }) {
 
         <Texto style={estilos.seccion}>Disponibilidad</Texto>
         <View style={estilos.tarjeta}>
-          <Chequeo ok={!conflictoProf} titulo={conflictoProf ? 'Profesional con otro bloque' : 'Profesional disponible'} texto={conflictoProf ? 'Ya atiende otra sala en este horario' : 'Sin cruces en este horario'} />
+          <Chequeo ok={!conflictoProf} titulo={conflictoProf ? 'Profesional con otro bloque' : 'Profesional disponible'} texto={conflictoProf ? `Ya atiende otra sala el ${nombresDias(diasConflictoProf)} a esta hora` : 'Sin cruces en este horario'} />
           <View style={estilos.linea} />
-          <Chequeo ok={!conflictoSala} titulo={conflictoSala ? 'Sala ocupada' : 'Sala disponible'} texto={conflictoSala ? 'Otro profesional usa la sala a esta hora' : `Capacidad para ${Math.max(max - ninosEnBloque.length, 0)} niños más`} />
+          <Chequeo ok={!conflictoSala} titulo={conflictoSala ? 'Sala ocupada' : 'Sala disponible'} texto={conflictoSala ? `Otro profesional usa la sala el ${nombresDias(diasConflictoSala)} a esta hora` : `Capacidad para ${espacios} niños más`} />
           <View style={estilos.linea} />
           <Chequeo ok={!cupoLleno && !yaAsignado && !excedido} titulo={yaAsignado ? 'Niño ya asignado' : excedido ? 'Demasiados niños' : cupoLleno ? 'Bloque lleno' : 'Cupo disponible'} texto={yaAsignado ? 'Alguno ya está en este bloque; quítalo de la lista' : excedido ? `Solo caben ${espacios} más en este bloque` : cupoLleno ? `Máximo de ${max} niños alcanzado` : `Se pueden agregar hasta ${espacios} niño(s)`} />
         </View>
@@ -182,6 +204,12 @@ const estilos = StyleSheet.create({
   capacidadSub: { fontSize: 11, color: colores.textoSuave },
   capacidadValor: { fontSize: 20, fontWeight: '800', color: colores.azul },
   etiqueta: { fontSize: 13, fontWeight: '600', color: colores.texto, marginBottom: 7 },
+  diasFila: { flexDirection: 'row', gap: 8 },
+  diaChip: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: 12, backgroundColor: '#fff', borderWidth: 1, borderColor: colores.borde },
+  diaChipActivo: { backgroundColor: colores.azul, borderColor: colores.azul },
+  diaChipTexto: { fontSize: 12, fontWeight: '700', color: colores.texto },
+  repite: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
+  repiteTexto: { fontSize: 11, color: colores.azul, fontWeight: '600' },
   ninosTitulo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   ninosCuenta: { fontSize: 11, color: colores.textoSuave, marginTop: 2 },
   seleccionado: { ...tarjeta, flexDirection: 'row', alignItems: 'center', padding: 8, marginBottom: 8 },

@@ -5,7 +5,7 @@ import Texto, { familiaDe } from '../components/Texto';
 import Chip from '../components/Chip';
 import Fab from '../components/Fab';
 import Insignia from '../components/Insignia';
-import { iniciales } from '../components/TarjetaNino';
+import Avatar from '../components/Avatar';
 import { colores, tarjeta } from '../tema';
 import Estado from '../components/Estado';
 import { useConsulta } from '../hooks';
@@ -41,7 +41,7 @@ export default function ProfesionalesScreen({ navigation }) {
         ListEmptyComponent={cargando || error ? <Estado cargando={cargando} error={error} recargar={recargar} /> : <Texto style={estilos.vacio}>No se encontraron profesionales.</Texto>}
         renderItem={({ item }) => (
           <TouchableOpacity style={estilos.fila} activeOpacity={0.8} onPress={() => navigation.navigate('FormularioProfesional', { profesionalId: item.id })}>
-            <View style={estilos.avatar}><Texto style={estilos.iniciales}>{iniciales(item.nombre)}</Texto></View>
+            <View style={{ marginRight: 12 }}><Avatar foto={item.foto} nombre={item.nombre} tam={42} radio={13} /></View>
             <View style={{ flex: 1 }}>
               <Texto style={estilos.nombre}>{item.nombre}</Texto>
               <Texto style={estilos.sub}>{item.especialidad} · {!item.activo ? 'No disponible' : item.bloques_hoy > 0 ? 'Disponible hoy' : 'Sin bloques hoy'}</Texto>

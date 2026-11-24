@@ -7,7 +7,7 @@ import { colores, tarjeta } from '../tema';
 import { useConsulta } from '../hooks';
 import AvisoSuspension from '../components/AvisoSuspension';
 import { obtenerSesionesDelDia, obtenerSuspensionDeFecha } from '../datos';
-import { diaLaboralDeHoy, hoyISO, horaActual, fechaLarga, NOMBRES_DIA } from '../utiles';
+import { diaSemanaDe, hoyISO, horaActual, fechaLarga, NOMBRES_DIA } from '../utiles';
 
 // Detalle de cada sesión de hoy: hora, sala, profesional y asistencia de cada niño.
 // «Dada» = la hora de fin del bloque ya pasó.
@@ -17,10 +17,16 @@ function estadoDelBloque(b, ahora) {
   return { texto: 'Pendiente', tipo: 'gris' };
 }
 
-export default function SesionesHoyScreen({ navigation }) {
-  const dia = diaLaboralDeHoy();
-  const { datos, cargando, error, recargar } = useConsulta(async (db) => ({ sesiones: await obtenerSesionesDelDia(db, dia, hoyISO()), suspension: await obtenerSuspensionDeFecha(db, hoyISO()) }), [dia]);
-  const ahora = horaActual();
+// Sin parámetros muestra HOY. Con route.params.fecha (AAAA-MM-DD) muestra ese día: los días pasados aparecen como «dadas»
+// con la asistencia que se registró, y los futuros como pendientes.
+export default function SesionesHoyScreen({ navigation, route }) {
+  const hoy = hoyISO();
+  const fecha = route.params?.fecha ?? hoy;
+  const dia = diaSemanaDe(fecha);
+  const { datos, cargando, error, recargar } = useConsulta(async (db) => ({ sesiones: await obtenerSesionesDelDia(db, dia, fecha), suspension: await obtenerSuspensionDeFecha(db, fecha) }), [dia, fecha]);
+  const ahora = fecha === hoy ? horaActual() : fecha < hoy ? '23:59' : '00:00';
+  const [a, m, d] = fecha.split('-').map(Number);
+  const fechaDia = new Date(a, m - 1, d);
 
   if (!datos) return <Estado cargando={cargando} error={error} recargar={recargar} />;
   const { sesiones: lista, suspension } = datos;
@@ -29,10 +35,10 @@ export default function SesionesHoyScreen({ navigation }) {
 
   return (
     <ScrollView style={{ backgroundColor: colores.fondo }} contentContainerStyle={{ padding: 16, paddingBottom: 30 }}>
-      <Texto style={estilos.fecha}>{fechaLarga()} · {ahora}</Texto>
+      <Texto style={estilos.fecha}>{fechaLarga(fechaDia)} de {a}{fecha === hoy ? ` · ${ahora}` : ''}</Texto>
       <AvisoSuspension suspension={suspension} />
       {!dia || lista.length === 0 ? (
-        <Texto style={estilos.vacio}>{suspension ? 'Hoy no hay sesiones: la atención está suspendida.' : dia ? `No hay bloques programados el ${NOMBRES_DIA[dia].toLowerCase()}.` : 'Hoy es fin de semana: el centro no tiene sesiones.'}</Texto>
+        <Texto style={estilos.vacio}>{suspension ? 'Ese día no hay sesiones: la atención está suspendida.' : dia ? `No hay bloques programados el ${NOMBRES_DIA[dia].toLowerCase()}.` : 'Es fin de semana: el centro no tiene sesiones.'}</Texto>
       ) : (
         <>
           <View style={estilos.resumen}>

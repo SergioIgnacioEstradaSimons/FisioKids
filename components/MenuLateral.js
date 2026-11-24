@@ -3,10 +3,10 @@ import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import Texto from './Texto';
-import { iniciales } from './TarjetaNino';
 import { colores, degradadoTarjeta } from '../tema';
 import { useSesion, irALogin } from '../sesion';
-import { notificacionesEjemplo } from '../semilla';
+import Avatar from './Avatar';
+import { useAvisosSinLeer } from '../hooks';
 
 // tab: true  -> es una pestaña dentro de «Tabs»; false -> es una pantalla del menú
 const MODULOS_ADMIN = [
@@ -14,6 +14,7 @@ const MODULOS_ADMIN = [
   { nombre: 'Niños', icono: 'user-plus', tab: true },
   { nombre: 'Profesionales', icono: 'users' },
   { nombre: 'Salas', icono: 'layout' },
+  { nombre: 'Tipos', etiqueta: 'Tipos de discapacidad', icono: 'heart' },
   { nombre: 'Horarios', icono: 'calendar', tab: true },
   { nombre: 'Mes', etiqueta: 'Gestión mensual', icono: 'layers', tab: true },
   { nombre: 'Suspensiones', icono: 'alert-triangle' },
@@ -36,7 +37,7 @@ export default function MenuLateral({ navigation, state }) {
   const { usuario, setUsuario } = useSesion();
   const ruta = state.routes[state.index];
   const activa = ruta.name === 'Tabs' ? ruta.state?.routes?.[ruta.state.index]?.name ?? 'Inicio' : ruta.name;
-  const sinLeer = notificacionesEjemplo.filter((n) => !n.leida).length;
+  const sinLeer = useAvisosSinLeer(usuario);
   const esAdmin = usuario?.rol === 'admin';
   const MODULOS = esAdmin ? MODULOS_ADMIN : MODULOS_PROFESIONAL;
 
@@ -59,7 +60,7 @@ export default function MenuLateral({ navigation, state }) {
       </View>
 
       <LinearGradient colors={degradadoTarjeta} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={estilos.usuario}>
-        <View style={estilos.avatar}><Texto style={estilos.iniciales}>{iniciales(usuario?.nombre)}</Texto></View>
+        <View style={{ marginRight: 12 }}><Avatar foto={usuario?.foto} nombre={usuario?.nombre} tam={40} fondo="rgba(255,255,255,0.18)" color="#fff" /></View>
         <View>
           <Texto style={estilos.nombre}>{usuario?.nombre}</Texto>
           <Texto style={estilos.rol}>{esAdmin ? 'Administradora' : usuario?.especialidad}</Texto>

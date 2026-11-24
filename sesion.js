@@ -10,3 +10,8 @@ export const navRef = createNavigationContainerRef();
 export function irALogin() {
   if (navRef.isReady()) navRef.reset({ index: 0, routes: [{ name: 'Login' }] });
 }
+
+// Pequeño sistema de eventos: cuando se leen avisos se actualiza el puntito de la campana y el menú
+const oyentes = new Set();
+export const alCambiarAvisos = (fn) => { oyentes.add(fn); return () => oyentes.delete(fn); };
+export const notificarAvisos = () => oyentes.forEach((fn) => fn());

@@ -6,6 +6,7 @@ import Texto from '../components/Texto';
 import Campo from '../components/Campo';
 import Selector from '../components/Selector';
 import Boton from '../components/Boton';
+import SelectorFoto from '../components/SelectorFoto';
 import { colores } from '../tema';
 import { useSQLiteContext } from 'expo-sqlite';
 import Estado from '../components/Estado';
@@ -28,6 +29,7 @@ function Formulario({ navigation, existente }) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
   const [v, setV] = useState({
+    foto: existente?.foto ?? null, // opcional
     nombres: existente?.nombres ?? '',
     apellidos: existente?.apellidos ?? '',
     especialidad: existente?.especialidad ?? null,
@@ -77,6 +79,7 @@ function Formulario({ navigation, existente }) {
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colores.fondo }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
+        <SelectorFoto foto={v.foto} nombre={`${v.nombres} ${v.apellidos}`} onChange={cambiar('foto')} etiqueta="Foto de perfil (opcional)" />
         <Texto style={estilos.seccion}>Datos del profesional</Texto>
         <Campo etiqueta="Nombres" obligatorio value={v.nombres} onChangeText={cambiar('nombres')} placeholder="Ej. Carmen Rosa" autoCapitalize="words" error={errores.nombres} />
         <Campo etiqueta="Apellidos" obligatorio value={v.apellidos} onChangeText={cambiar('apellidos')} placeholder="Ej. Ruiz Vargas" autoCapitalize="words" error={errores.apellidos} />

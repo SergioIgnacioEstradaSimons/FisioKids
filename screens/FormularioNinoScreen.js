@@ -10,12 +10,13 @@ import { colores } from '../tema';
 import { useSQLiteContext } from 'expo-sqlite';
 import Estado from '../components/Estado';
 import { useConsulta } from '../hooks';
-import { obtenerNino, agregarNino, modificarNino, ninoExiste } from '../datos';
-import { isoADmy, dmyAIso, TIPOS_DISCAPACIDAD, GRADOS as LISTA_GRADOS, limpiar } from '../utiles';
+import ModalTexto from '../components/ModalTexto';
+import { obtenerNino, agregarNino, modificarNino, ninoExiste, obtenerTipos, agregarTipo, tipoExiste } from '../datos';
+import { isoADmy, dmyAIso, GRADOS as LISTA_GRADOS, limpiar } from '../utiles';
 
 const GRADOS = LISTA_GRADOS.map((g) => ({ valor: g, etiqueta: g }));
 const SOLO_LETRAS = /^[A-Za-zÁÉÍÓÚáéíóúÑñÜü ]+$/;
-const TIPOS = TIPOS_DISCAPACIDAD.map((t) => ({ valor: t, etiqueta: t }));
+const NUEVO_TIPO = '__nuevo__';
 
 // Pone las diagonales mientras se escribe la fecha: 14032019 -> 14/03/2019
 const formatearFecha = (t) => {
@@ -61,12 +62,15 @@ function validar(v) {
 // Envoltorio: si llega ninoId, primero lee el niño de SQLite y luego muestra el formulario
 export default function FormularioNinoScreen(props) {
   const id = props.route.params?.ninoId;
-  const { datos, cargando, error, recargar } = useConsulta((db) => (id ? obtenerNino(db, id) : Promise.resolve(null)), [id]);
-  if (cargando || error) return <Estado cargando={cargando} error={error} recargar={recargar} />;
-  return <Formulario {...props} existente={datos} />;
+  const { datos, cargando, error, recargar } = useConsulta(async (db) => ({
+    existente: id ? await obtenerNino(db, id) : null,
+    tipos: await obtenerTipos(db, true), // los tipos activos; el administrador puede agregar más
+  }), [id]);
+  if (cargando || error || !datos) return <Estado cargando={cargando} error={error} recargar={recargar} />;
+  return <Formulario {...props} existente={datos.existente} tipos={datos.tipos} recargarTipos={recargar} />;
 }
 
-function Formulario({ navigation, existente }) {
+function Formulario({ navigation, existente, tipos, recargarTipos }) {
   const db = useSQLiteContext();
   const insets = useSafeAreaInsets();
   const [v, setV] = useState({
@@ -80,6 +84,20 @@ function Formulario({ navigation, existente }) {
     observaciones: existente?.observaciones ?? '',
   });
   const [errores, setErrores] = useState({});
+  const [nuevoTipo, setNuevoTipo] = useState(false);
+  // tipos activos (+ el que ya tiene el niño aunque esté inactivo) y la opción para agregar uno nuevo
+  const nombres = tipos.map((t) => t.nombre);
+  if (existente?.tipo_discapacidad && !nombres.includes(existente.tipo_discapacidad)) nombres.push(existente.tipo_discapacidad);
+  const opcionesTipo = [...nombres.map((t) => ({ valor: t, etiqueta: t })), { valor: NUEVO_TIPO, etiqueta: '＋ Agregar nuevo tipo' }];
+  const guardarNuevoTipo = async (texto) => {
+    const nombre = limpiar(texto);
+    if (nombre.length < 3) return 'Escribe al menos 3 caracteres';
+    if (await tipoExiste(db, nombre)) return 'Ese tipo ya existe';
+    await agregarTipo(db, nombre); // INSERT INTO tipos_discapacidad
+    await recargarTipos();
+    setV((anterior) => ({ ...anterior, tipo: nombre }));
+    return null;
+  };
   const cambiar = (campo) => (valor) => setV({ ...v, [campo]: valor });
 
   const guardar = async () => {
@@ -117,7 +135,8 @@ function Formulario({ navigation, existente }) {
         <Campo etiqueta="Fecha de nacimiento" obligatorio icono="calendar" value={v.fecha} onChangeText={(t) => cambiar('fecha')(formatearFecha(t))}
           placeholder="DD/MM/AAAA" keyboardType="number-pad" maxLength={10} error={errores.fecha} />
         <View style={{ flexDirection: 'row', gap: 10 }}>
-          <Selector estiloContenedor={{ flex: 3 }} etiqueta="Tipo de discapacidad" obligatorio valor={v.tipo} opciones={TIPOS} onChange={cambiar('tipo')} error={errores.tipo} />
+          <Selector estiloContenedor={{ flex: 3 }} etiqueta="Tipo de discapacidad" obligatorio valor={v.tipo} opciones={opcionesTipo}
+            onChange={(t) => (t === NUEVO_TIPO ? setNuevoTipo(true) : cambiar('tipo')(t))} error={errores.tipo} />
           <Selector estiloContenedor={{ flex: 2 }} etiqueta="Grado de discapacidad" obligatorio valor={v.grado} opciones={GRADOS} onChange={cambiar('grado')} error={errores.grado} />
         </View>
 
@@ -132,6 +151,8 @@ function Formulario({ navigation, existente }) {
         <Boton texto="Cancelar" variante="secundario" style={{ flex: 1, marginBottom: 0 }} onPress={() => navigation.goBack()} />
         <Boton texto={existente ? 'Guardar cambios' : 'Guardar niño'} icono="check" style={{ flex: 1.6, marginBottom: 0 }} onPress={guardar} />
       </View>
+      <ModalTexto visible={nuevoTipo} titulo="Nuevo tipo de discapacidad" etiqueta="Nombre del tipo" placeholder="Ej. Discapacidad visual" textoBoton="Agregar"
+        onGuardar={guardarNuevoTipo} onCerrar={() => setNuevoTipo(false)} />
     </KeyboardAvoidingView>
   );
 }

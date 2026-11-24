@@ -3,11 +3,11 @@
 // Cada función recibe `db` (se obtiene con useSQLiteContext()) y es asíncrona.
 
 import * as Crypto from 'expo-crypto';
-import { usuariosEjemplo, salasEjemplo, ninosEjemplo, bloquesEjemplo, asignacionesEjemplo } from './semilla';
-import { aISO, sumarHora, rangoMes } from './utiles';
+import { usuariosEjemplo, salasEjemplo, ninosEjemplo, bloquesEjemplo, asignacionesEjemplo, TIPOS_DISCAPACIDAD } from './semilla';
+import { aISO, sumarHora, rangoMes, diaSemanaDe, sumarDiasISO, NOMBRES_DIA } from './utiles';
 
 export const NOMBRE_BASE = 'fisiokids.db';
-const VERSION_ESQUEMA = 3; // 2: nombres/apellidos separados y grado por categoría · 3: cierre de bloques
+const VERSION_ESQUEMA = 4; // 2: nombres/apellidos y grado por categoría · 3: cierre de bloques · 4: foto de perfil, tipos de discapacidad y avisos leídos
 
 export const ESQUEMA = `
 CREATE TABLE IF NOT EXISTS usuarios (
@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   rol           TEXT NOT NULL CHECK (rol IN ('admin','profesional')),
   especialidad  TEXT,
   activo        INTEGER NOT NULL DEFAULT 1,
+  foto          TEXT,                         -- foto de perfil (imagen en base64), opcional
   UNIQUE (nombres, apellidos)                 -- evita profesionales duplicados
 );
 
@@ -79,6 +80,18 @@ CREATE TABLE IF NOT EXISTS cierres_bloque (   -- un bloque se «cierra» cada d�
   UNIQUE (bloque_id, fecha)
 );
 
+CREATE TABLE IF NOT EXISTS tipos_discapacidad ( -- el administrador puede agregar más tipos
+  id     INTEGER PRIMARY KEY AUTOINCREMENT,
+  nombre TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  activo INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS avisos_leidos (    -- avisos (notificaciones) que cada usuario ya leyó
+  usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  clave      TEXT NOT NULL,
+  PRIMARY KEY (usuario_id, clave)
+);
+
 CREATE TABLE IF NOT EXISTS suspensiones (     -- se llena con los feriados de la API (Jornada 4)
   id     INTEGER PRIMARY KEY AUTOINCREMENT,
   fecha  TEXT NOT NULL UNIQUE,
@@ -95,19 +108,30 @@ export const cifrar = (texto) => Crypto.digestStringAsync(Crypto.CryptoDigestAlg
 export async function iniciarBase(db) {
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
   const fila = await db.getFirstAsync('PRAGMA user_version');
-  if (fila.user_version >= VERSION_ESQUEMA) return;
-  if (fila.user_version < 2) {
+  const version = fila.user_version;
+  if (version >= VERSION_ESQUEMA) return;
+  if (version < 2) {
     // Esquema muy antiguo: se descartan las tablas de prueba y se vuelven a crear con datos iniciales
-    await db.execAsync(`DROP TABLE IF EXISTS cierres_bloque; DROP TABLE IF EXISTS asistencias; DROP TABLE IF EXISTS asignaciones; DROP TABLE IF EXISTS bloques;
+    await db.execAsync(`DROP TABLE IF EXISTS avisos_leidos; DROP TABLE IF EXISTS tipos_discapacidad; DROP TABLE IF EXISTS cierres_bloque;
+      DROP TABLE IF EXISTS asistencias; DROP TABLE IF EXISTS asignaciones; DROP TABLE IF EXISTS bloques;
       DROP TABLE IF EXISTS suspensiones; DROP TABLE IF EXISTS ninos; DROP TABLE IF EXISTS salas; DROP TABLE IF EXISTS usuarios;`);
     await db.execAsync(ESQUEMA);
     await sembrar(db);
   } else {
-    // Versión 2 -> 3: solo se agrega la tabla nueva y se marcan como cerrados los días que ya tenían asistencia (no se pierde nada)
+    // Migración sin perder datos: se crean las tablas nuevas y se agregan las columnas que falten
     await db.execAsync(ESQUEMA);
-    await db.execAsync('INSERT OR IGNORE INTO cierres_bloque (bloque_id, fecha) SELECT DISTINCT bloque_id, fecha FROM asistencias');
+    if (version < 3) {
+      await db.execAsync('INSERT OR IGNORE INTO cierres_bloque (bloque_id, fecha) SELECT DISTINCT bloque_id, fecha FROM asistencias');
+    }
+    const columnas = await db.getAllAsync('PRAGMA table_info(usuarios)');
+    if (!columnas.some((c) => c.name === 'foto')) await db.execAsync('ALTER TABLE usuarios ADD COLUMN foto TEXT');
+    await sembrarTipos(db);
   }
   await db.execAsync(`PRAGMA user_version = ${VERSION_ESQUEMA}`);
+}
+
+async function sembrarTipos(db) {
+  for (const t of TIPOS_DISCAPACIDAD) await db.runAsync('INSERT OR IGNORE INTO tipos_discapacidad (nombre) VALUES (?)', [t]);
 }
 
 const ACTIVIDADES = {
@@ -124,6 +148,7 @@ async function sembrar(db) {
         'INSERT INTO usuarios (id, nombres, apellidos, correo, contrasena, rol, especialidad, activo) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
         [u.id, u.nombres, u.apellidos, u.correo, await cifrar(u.contrasena), u.rol, u.especialidad, u.activo]);
     }
+    await sembrarTipos(db);
     for (const s of salasEjemplo) {
       await db.runAsync('INSERT INTO salas (id, nombre, capacidad, activo) VALUES (?, ?, ?, ?)', [s.id, s.nombre, s.capacidad, s.activo]);
     }
@@ -164,7 +189,7 @@ async function sembrar(db) {
 // ---------------------------------------------------------------------------------------------
 export async function iniciarSesion(db, correo, contrasena) {
   return db.getFirstAsync(
-    "SELECT id, nombres, apellidos, nombres || ' ' || apellidos AS nombre, correo, rol, especialidad FROM usuarios WHERE correo = ? AND contrasena = ? AND activo = 1",
+    "SELECT id, nombres, apellidos, nombres || ' ' || apellidos AS nombre, correo, rol, especialidad, foto FROM usuarios WHERE correo = ? AND contrasena = ? AND activo = 1",
     [correo.trim().toLowerCase(), await cifrar(contrasena)]);
 }
 
@@ -185,18 +210,21 @@ export const usuarioConNombreExiste = async (db, nombres, apellidos, excluirId =
 
 export async function agregarProfesional(db, p) {
   return db.runAsync(
-    "INSERT INTO usuarios (nombres, apellidos, correo, contrasena, rol, especialidad) VALUES (?, ?, ?, ?, 'profesional', ?)",
-    [p.nombres.trim(), p.apellidos.trim(), p.correo.trim().toLowerCase(), await cifrar(p.contrasena), p.especialidad]);
+    "INSERT INTO usuarios (nombres, apellidos, correo, contrasena, rol, especialidad, foto) VALUES (?, ?, ?, ?, 'profesional', ?, ?)",
+    [p.nombres.trim(), p.apellidos.trim(), p.correo.trim().toLowerCase(), await cifrar(p.contrasena), p.especialidad, p.foto ?? null]);
 }
 
 export async function modificarProfesional(db, id, p) {
   if (p.contrasena) {
-    return db.runAsync('UPDATE usuarios SET nombres = ?, apellidos = ?, correo = ?, especialidad = ?, activo = ?, contrasena = ? WHERE id = ?',
-      [p.nombres.trim(), p.apellidos.trim(), p.correo.trim().toLowerCase(), p.especialidad, p.activo, await cifrar(p.contrasena), id]);
+    return db.runAsync('UPDATE usuarios SET nombres = ?, apellidos = ?, correo = ?, especialidad = ?, activo = ?, foto = ?, contrasena = ? WHERE id = ?',
+      [p.nombres.trim(), p.apellidos.trim(), p.correo.trim().toLowerCase(), p.especialidad, p.activo, p.foto ?? null, await cifrar(p.contrasena), id]);
   }
-  return db.runAsync('UPDATE usuarios SET nombres = ?, apellidos = ?, correo = ?, especialidad = ?, activo = ? WHERE id = ?',
-    [p.nombres.trim(), p.apellidos.trim(), p.correo.trim().toLowerCase(), p.especialidad, p.activo, id]);
+  return db.runAsync('UPDATE usuarios SET nombres = ?, apellidos = ?, correo = ?, especialidad = ?, activo = ?, foto = ? WHERE id = ?',
+    [p.nombres.trim(), p.apellidos.trim(), p.correo.trim().toLowerCase(), p.especialidad, p.activo, p.foto ?? null, id]);
 }
+
+// Foto de perfil (imagen en base64 o null para quitarla)
+export const modificarFoto = (db, id, foto) => db.runAsync('UPDATE usuarios SET foto = ? WHERE id = ?', [foto ?? null, id]);
 
 // Mi perfil: cada usuario puede cambiar sus nombres, apellidos y contraseña (NO el correo ni el rol)
 export async function modificarPerfil(db, id, { nombres, apellidos, contrasena }) {
@@ -280,33 +308,38 @@ export const obtenerBloquesDeNino = (db, ninoId) => db.getAllAsync(
 export const obtenerHorariosPorNino = (db) => db.getAllAsync(
   `SELECT a.nino_id, b.dia_semana, b.hora_inicio FROM asignaciones a JOIN bloques b ON b.id = a.bloque_id ORDER BY b.dia_semana, b.hora_inicio`);
 
-// Asigna uno o varios niños (ninoIds) a un bloque, y crea el bloque si todavía no existe.
-// Es «todo o nada»: si algo falla (cupo, conflicto, duplicado) no se guarda ningún niño.
+// Asigna uno o varios niños (ninoIds) a un bloque y lo repite en varios días de la semana (dias = [1, 3, 5]).
+// Como cada bloque es semanal, una asignación del lunes se repite TODOS los lunes del mes.
+// Es «todo o nada»: si algo falla (cupo, conflicto, duplicado) no se guarda nada.
 // Lanza un Error con un mensaje claro si se rompe alguna regla.
-export async function crearAsignacion(db, { ninoIds, profesionalId, salaId, dia, hora, actividad }) {
+export async function crearAsignacion(db, { ninoIds, profesionalId, salaId, dias, hora, actividad }) {
   if (!ninoIds || ninoIds.length === 0) throw new Error('Selecciona al menos un niño.');
+  if (!dias || dias.length === 0) throw new Error('Selecciona al menos un día.');
   await db.withTransactionAsync(async () => {
     const sala = await db.getFirstAsync('SELECT capacidad FROM salas WHERE id = ?', [salaId]);
     const max = Math.min(4, sala.capacidad);
-    let bloque = await db.getFirstAsync('SELECT * FROM bloques WHERE dia_semana = ? AND hora_inicio = ? AND sala_id = ?', [dia, hora, salaId]);
-    if (bloque) {
-      if (bloque.profesional_id !== profesionalId) throw new Error('La sala ya está ocupada por otro profesional en ese horario.');
-    } else {
-      const ocupado = await db.getFirstAsync('SELECT COUNT(*) AS n FROM bloques WHERE dia_semana = ? AND hora_inicio = ? AND profesional_id = ?', [dia, hora, profesionalId]);
-      if (ocupado.n > 0) throw new Error('El profesional ya atiende otra sala en ese horario.');
-      const r = await db.runAsync(
-        'INSERT INTO bloques (dia_semana, hora_inicio, hora_fin, actividad, profesional_id, sala_id) VALUES (?, ?, ?, ?, ?, ?)',
-        [dia, hora, sumarHora(hora), actividad, profesionalId, salaId]);
-      bloque = { id: r.lastInsertRowId };
-    }
-    const cupo = (await db.getFirstAsync('SELECT COUNT(*) AS n FROM asignaciones WHERE bloque_id = ?', [bloque.id])).n;
-    if (cupo + ninoIds.length > max) {
-      throw new Error(`El bloque admite máximo ${max} niños y ya tiene ${cupo}. Solo puedes agregar ${Math.max(max - cupo, 0)} más.`);
-    }
-    for (const ninoId of ninoIds) {
-      const repetido = await db.getFirstAsync('SELECT COUNT(*) AS n FROM asignaciones WHERE bloque_id = ? AND nino_id = ?', [bloque.id, ninoId]);
-      if (repetido.n > 0) throw new Error('Uno de los niños ya está asignado a este bloque.');
-      await db.runAsync('INSERT INTO asignaciones (bloque_id, nino_id) VALUES (?, ?)', [bloque.id, ninoId]);
+    for (const dia of dias) {
+      const nombreDia = NOMBRES_DIA[dia];
+      let bloque = await db.getFirstAsync('SELECT * FROM bloques WHERE dia_semana = ? AND hora_inicio = ? AND sala_id = ?', [dia, hora, salaId]);
+      if (bloque) {
+        if (bloque.profesional_id !== profesionalId) throw new Error(`${nombreDia}: la sala ya está ocupada por otro profesional en ese horario.`);
+      } else {
+        const ocupado = await db.getFirstAsync('SELECT COUNT(*) AS n FROM bloques WHERE dia_semana = ? AND hora_inicio = ? AND profesional_id = ?', [dia, hora, profesionalId]);
+        if (ocupado.n > 0) throw new Error(`${nombreDia}: el profesional ya atiende otra sala en ese horario.`);
+        const r = await db.runAsync(
+          'INSERT INTO bloques (dia_semana, hora_inicio, hora_fin, actividad, profesional_id, sala_id) VALUES (?, ?, ?, ?, ?, ?)',
+          [dia, hora, sumarHora(hora), actividad, profesionalId, salaId]);
+        bloque = { id: r.lastInsertRowId };
+      }
+      const cupo = (await db.getFirstAsync('SELECT COUNT(*) AS n FROM asignaciones WHERE bloque_id = ?', [bloque.id])).n;
+      if (cupo + ninoIds.length > max) {
+        throw new Error(`${nombreDia}: el bloque admite máximo ${max} niños y ya tiene ${cupo}. Solo puedes agregar ${Math.max(max - cupo, 0)} más.`);
+      }
+      for (const ninoId of ninoIds) {
+        const repetido = await db.getFirstAsync('SELECT COUNT(*) AS n FROM asignaciones WHERE bloque_id = ? AND nino_id = ?', [bloque.id, ninoId]);
+        if (repetido.n > 0) throw new Error(`${nombreDia}: uno de los niños ya está asignado a ese bloque.`);
+        await db.runAsync('INSERT INTO asignaciones (bloque_id, nino_id) VALUES (?, ?)', [bloque.id, ninoId]);
+      }
     }
   });
 }
@@ -352,19 +385,20 @@ export async function contarTotales(db) {
   };
 }
 
-// Resumen del día. Una sesión está «dada» cuando la hora de fin del bloque ya pasó (hora = 'HH:MM').
+// Resumen del día según las ASISTENCIAS REGISTRADAS (no según la hora).
+// programadas = niños asignados a los bloques de hoy; registradas = niños con asistencia guardada hoy.
 // dia = 1..5 (null si es fin de semana, sin sesiones).
-export async function resumenDelDia(db, dia, fecha, hora) {
-  if (!dia || await obtenerSuspensionDeFecha(db, fecha)) return { programadas: 0, dadas: 0, presentes: 0, faltas: 0 };
+export async function resumenDelDia(db, dia, fecha) {
+  if (!dia || await obtenerSuspensionDeFecha(db, fecha)) return { programadas: 0, registradas: 0, presentes: 0, faltas: 0 };
   const programadas = (await db.getFirstAsync(
     'SELECT COUNT(*) AS n FROM asignaciones a JOIN bloques b ON b.id = a.bloque_id WHERE b.dia_semana = ?', [dia])).n;
-  const dadas = (await db.getFirstAsync(
-    'SELECT COUNT(*) AS n FROM asignaciones a JOIN bloques b ON b.id = a.bloque_id WHERE b.dia_semana = ? AND b.hora_fin <= ?', [dia, hora])).n;
   const filas = await db.getAllAsync(
     `SELECT a.estado, COUNT(*) AS n FROM asistencias a JOIN bloques b ON b.id = a.bloque_id
-     WHERE a.fecha = ? AND b.dia_semana = ? AND b.hora_fin <= ? GROUP BY a.estado`, [fecha, dia, hora]);
+     WHERE a.fecha = ? AND b.dia_semana = ? GROUP BY a.estado`, [fecha, dia]);
   const cuenta = (e) => filas.find((f) => f.estado === e)?.n ?? 0;
-  return { programadas, dadas, presentes: cuenta('Presente'), faltas: cuenta('Falta') };
+  const presentes = cuenta('Presente');
+  const faltas = cuenta('Falta');
+  return { programadas, registradas: presentes + faltas, presentes, faltas };
 }
 
 // Detalle de cada sesión del día: bloque + niños con su estado de asistencia (o null si no se registró)
@@ -507,4 +541,95 @@ export async function resumenHistorial(db, anio, mesIdx, profesionalId = null) {
   // barras por día de la semana: L M X J V S D (strftime: 0 = domingo)
   const barras = [1, 2, 3, 4, 5, 6, 0].map((d) => porDia.find((x) => Number(x.dia) === d)?.n ?? 0);
   return { generadas, presentes, faltas, suspendidas, porcentaje: generadas ? Math.round((presentes / generadas) * 100) : 0, barras, recientes };
+}
+
+// ---------------------------------------------------------------------------------------------
+// TIPOS DE DISCAPACIDAD (el administrador puede agregar más)
+// ---------------------------------------------------------------------------------------------
+export const obtenerTipos = (db, soloActivos = false) => db.getAllAsync(
+  `SELECT t.*, (SELECT COUNT(*) FROM ninos n WHERE n.tipo_discapacidad = t.nombre) AS usados
+   FROM tipos_discapacidad t WHERE (? = 0 OR t.activo = 1) ORDER BY t.nombre`, [soloActivos ? 1 : 0]);
+export const tipoExiste = async (db, nombre, excluirId = 0) =>
+  (await db.getFirstAsync('SELECT COUNT(*) AS n FROM tipos_discapacidad WHERE LOWER(nombre) = LOWER(?) AND id <> ?', [nombre.trim(), excluirId])).n > 0;
+export const agregarTipo = (db, nombre) => db.runAsync('INSERT INTO tipos_discapacidad (nombre) VALUES (?)', [nombre.trim()]);
+// Al renombrar un tipo también se actualizan los niños que lo tienen
+export async function renombrarTipo(db, id, nombreNuevo) {
+  await db.withTransactionAsync(async () => {
+    const actual = await db.getFirstAsync('SELECT nombre FROM tipos_discapacidad WHERE id = ?', [id]);
+    await db.runAsync('UPDATE tipos_discapacidad SET nombre = ? WHERE id = ?', [nombreNuevo.trim(), id]);
+    await db.runAsync('UPDATE ninos SET tipo_discapacidad = ? WHERE tipo_discapacidad = ?', [nombreNuevo.trim(), actual.nombre]);
+  });
+}
+export const cambiarEstadoTipo = (db, id, activo) => db.runAsync('UPDATE tipos_discapacidad SET activo = ? WHERE id = ?', [activo, id]);
+// Solo se puede borrar un tipo que ningún niño usa
+export const eliminarTipo = (db, id) => db.runAsync(
+  'DELETE FROM tipos_discapacidad WHERE id = ? AND NOT EXISTS (SELECT 1 FROM ninos n WHERE n.tipo_discapacidad = tipos_discapacidad.nombre)', [id]);
+
+// ---------------------------------------------------------------------------------------------
+// AVISOS (notificaciones). Se calculan con los datos reales de la base.
+// ---------------------------------------------------------------------------------------------
+// Para cada bloque de hoy cuyo horario ya pasó: si no se cerró su asistencia es un aviso de pendiente,
+// y si se cerró es un aviso de bloque finalizado. El profesional solo ve sus bloques; el administrador, todos.
+// También avisa de las suspensiones de hoy y de los próximos 7 días.
+export async function obtenerAvisos(db, usuario, fecha, hora) {
+  const avisos = [];
+  const dia = diaSemanaDe(fecha);
+  const suspensionHoy = await obtenerSuspensionDeFecha(db, fecha);
+  if (suspensionHoy) {
+    avisos.push({ clave: `susp:${fecha}`, grupo: 'Hoy', orden: '99:99', icono: 'alert-triangle', tinte: 'naranja', titulo: 'Atención suspendida hoy',
+      texto: `${suspensionHoy.motivo}. No hay sesiones ni asistencia.`, hace: 'Hoy' });
+  } else if (dia) {
+    const bloques = await obtenerBloquesConEstado(db, dia, fecha, usuario.rol === 'profesional' ? usuario.id : null);
+    const conteos = await db.getAllAsync('SELECT bloque_id, estado, COUNT(*) AS n FROM asistencias WHERE fecha = ? GROUP BY bloque_id, estado', [fecha]);
+    const cuenta = (id, e) => conteos.find((c) => c.bloque_id === id && c.estado === e)?.n ?? 0;
+    for (const b of bloques) {
+      if (b.hora_fin > hora) continue; // el horario todavía no pasó
+      const detalle = `${b.actividad} · ${b.sala_nombre}${usuario.rol === 'admin' ? ` · Lic. ${b.profesional_nombre}` : ''}`;
+      if (b.cerrado) {
+        const p = cuenta(b.id, 'Presente');
+        const f = cuenta(b.id, 'Falta');
+        avisos.push({ clave: `fin:${b.id}:${fecha}`, grupo: 'Hoy', orden: b.hora_fin, icono: 'check-circle', tinte: 'verde', titulo: `Bloque de las ${b.hora_inicio} finalizado`,
+          texto: `${detalle}. ${p} ${p === 1 ? 'presente' : 'presentes'} y ${f} ${f === 1 ? 'falta' : 'faltas'}.`, hace: `Terminó a las ${b.hora_fin}`, bloqueId: b.id });
+      } else {
+        avisos.push({ clave: `pend:${b.id}:${fecha}`, grupo: 'Hoy', orden: b.hora_fin, icono: 'clock', tinte: 'naranja', titulo: `Bloque de las ${b.hora_inicio} sin cerrar`,
+          texto: `${detalle}. Ya pasó su horario y falta registrar o cerrar la asistencia.`, hace: `Terminó a las ${b.hora_fin}`, bloqueId: b.id, pendiente: true });
+      }
+    }
+  }
+  const proximas = await db.getAllAsync('SELECT * FROM suspensiones WHERE fecha > ? AND fecha <= ? ORDER BY fecha', [fecha, sumarDiasISO(fecha, 7)]);
+  for (const s of proximas) {
+    avisos.push({ clave: `susp:${s.fecha}`, grupo: 'Próximos días', orden: s.fecha, icono: 'alert-triangle', tinte: 'naranja', titulo: 'Suspensión programada',
+      texto: `El ${s.fecha.split('-').reverse().join('/')} no habrá atención: ${s.motivo}.`, hace: 'Próximos 7 días' });
+  }
+  // «Hoy» primero (lo más reciente arriba) y luego los próximos días
+  return avisos.sort((a, b) => (a.grupo === b.grupo ? (a.grupo === 'Hoy' ? b.orden.localeCompare(a.orden) : a.orden.localeCompare(b.orden)) : a.grupo === 'Hoy' ? -1 : 1));
+}
+
+export async function obtenerClavesLeidas(db, usuarioId) {
+  const filas = await db.getAllAsync('SELECT clave FROM avisos_leidos WHERE usuario_id = ?', [usuarioId]);
+  return new Set(filas.map((f) => f.clave));
+}
+export const marcarAvisoLeido = (db, usuarioId, clave) => db.runAsync('INSERT OR IGNORE INTO avisos_leidos (usuario_id, clave) VALUES (?, ?)', [usuarioId, clave]);
+export async function marcarAvisosLeidos(db, usuarioId, claves) {
+  await db.withTransactionAsync(async () => {
+    for (const c of claves) await db.runAsync('INSERT OR IGNORE INTO avisos_leidos (usuario_id, clave) VALUES (?, ?)', [usuarioId, c]);
+  });
+}
+
+// ---------------------------------------------------------------------------------------------
+// CALENDARIO MENSUAL: asistencias registradas por día, suspensiones y bloques programados por día de la semana
+// ---------------------------------------------------------------------------------------------
+export async function obtenerResumenMes(db, anio, mesIdx) {
+  const [desde, hasta] = rangoMes(anio, mesIdx);
+  const asistencias = await db.getAllAsync(
+    `SELECT fecha, SUM(CASE WHEN estado = 'Presente' THEN 1 ELSE 0 END) AS presentes,
+            SUM(CASE WHEN estado = 'Falta' THEN 1 ELSE 0 END) AS faltas
+     FROM asistencias WHERE fecha BETWEEN ? AND ? GROUP BY fecha`, [desde, hasta]);
+  const suspensiones = await db.getAllAsync('SELECT fecha, motivo FROM suspensiones WHERE fecha BETWEEN ? AND ?', [desde, hasta]);
+  const bloques = await db.getAllAsync('SELECT dia_semana, COUNT(*) AS n FROM bloques GROUP BY dia_semana');
+  return {
+    porFecha: Object.fromEntries(asistencias.map((a) => [a.fecha, { presentes: a.presentes, faltas: a.faltas }])),
+    suspendidas: Object.fromEntries(suspensiones.map((s) => [s.fecha, s.motivo])),
+    bloquesPorDia: Object.fromEntries(bloques.map((b) => [b.dia_semana, b.n])),
+  };
 }

@@ -1,6 +1,5 @@
 // utiles.js — constantes y funciones de apoyo (fechas, textos). No tocan la base de datos.
 
-export const TIPOS_DISCAPACIDAD = ['Parálisis cerebral', 'Síndrome de Down', 'TEA', 'Retraso motor', 'Hipotonía', 'Trastorno de coordinación', 'Otro'];
 export const NOMBRES_DIA = ['', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
 export const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 // Turnos del centro: mañana de 8:00 a 12:00 y tarde de 14:00 a 19:00 (bloques de 1 hora; se muestra la hora de inicio)
@@ -90,3 +89,14 @@ export function lunesDe(f = new Date()) {
   l.setHours(0, 0, 0, 0);
   return l;
 }
+
+// Día de la semana (1 = lunes ... 5 = viernes) de una fecha AAAA-MM-DD; null si es sábado o domingo
+export function diaSemanaDe(iso) {
+  const [a, m, d] = iso.split('-').map(Number);
+  const n = new Date(a, m - 1, d).getDay();
+  return n >= 1 && n <= 5 ? n : null;
+}
+export const sumarDiasISO = (iso, dias) => {
+  const [a, m, d] = iso.split('-').map(Number);
+  return aISO(new Date(a, m - 1, d + dias));
+};

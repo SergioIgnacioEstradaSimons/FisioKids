@@ -65,3 +65,6 @@ export const notificacionesEjemplo = [
   { id: 5, grupo: 'Ayer', icono: 'bell', tinte: 'azul', titulo: 'Recordatorio de sesión', texto: 'Mañana tienes 6 sesiones desde las 08:00.', hace: 'Ayer, 09:00', leida: true },
 ];
 
+
+// Tipos de discapacidad iniciales (el administrador puede agregar más desde la app)
+export const TIPOS_DISCAPACIDAD = ['Parálisis cerebral', 'Síndrome de Down', 'TEA', 'Retraso motor', 'Hipotonía', 'Trastorno de coordinación', 'Otro'];
