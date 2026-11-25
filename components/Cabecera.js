@@ -42,9 +42,11 @@ export default function Cabecera({ titulo, navigation, menu }) {
 }
 
 // Fábrica para usarla como opción `header` de los navegadores
-export const crearCabecera = (menu) => ({ navigation, options, route }) => (
-  <Cabecera titulo={options.title ?? route.name} navigation={navigation} menu={menu} />
-);
+export function crearCabecera(menu) {
+  return function CabeceraNavegador({ navigation, options, route }) {
+    return <Cabecera titulo={options.title ?? route.name} navigation={navigation} menu={menu} />;
+  };
+}
 
 const estilos = StyleSheet.create({
   barra: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 10, backgroundColor: colores.fondo },

@@ -1,5 +1,5 @@
-// semilla.js — datos iniciales que se cargan UNA sola vez en SQLite (ver iniciarBase en datos.js).
-// Después de eso la app lee y escribe en la base; estos arreglos ya no se usan para mostrar pantallas.
+// semilla.js — datos iniciales cargados en Supabase desde supabase/02_datos_iniciales.sql.
+// Estos arreglos solo documentan la semilla; la app lee y escribe en Supabase.
 
 export const usuariosEjemplo = [
   { id: 1, nombres: 'Andrea', apellidos: 'Mendoza', correo: 'admin@fisiokids.bo', contrasena: 'admin123', rol: 'admin', especialidad: 'Administración', activo: 1 },

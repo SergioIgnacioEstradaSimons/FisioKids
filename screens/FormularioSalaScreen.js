@@ -6,7 +6,7 @@ import Campo from '../components/Campo';
 import Selector from '../components/Selector';
 import Boton from '../components/Boton';
 import { colores } from '../tema';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useBase } from '../supabase';
 import Estado from '../components/Estado';
 import { useConsulta } from '../hooks';
 import { obtenerSala, salaExiste, agregarSala, modificarSala } from '../datos';
@@ -22,7 +22,7 @@ export default function FormularioSalaScreen(props) {
 }
 
 function Formulario({ navigation, existente }) {
-  const db = useSQLiteContext();
+  const db = useBase();
   const insets = useSafeAreaInsets();
   const [v, setV] = useState({
     nombre: existente?.nombre ?? '',

@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { View, ScrollView, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useBase } from '../supabase';
 import Texto from './Texto';
 import Boton from './Boton';
 import Estado from './Estado';
@@ -19,7 +19,7 @@ import { hoyISO, calcularEdad, estadoBloque } from '../utiles';
 // Reglas: 1) no se puede si un bloque anterior del mismo profesional sigue abierto; 2) un bloque cerrado
 // no admite cambios (solo el administrador puede reabrirlo).
 export default function PanelAsistencia({ bloqueId, navigation }) {
-  const db = useSQLiteContext();
+  const db = useBase();
   const { usuario } = useSesion();
   const fecha = hoyISO();
   const { datos, cargando, error, recargar } = useConsulta(async (d) => ({
@@ -31,15 +31,12 @@ export default function PanelAsistencia({ bloqueId, navigation }) {
     suspension: await obtenerSuspensionDeFecha(d, fecha),
   }), [bloqueId]);
 
-  const [estados, setEstados] = useState({}); // { ninoId: 'Presente' | 'Falta' } (lo marcado en pantalla)
-  useEffect(() => {
-    if (!datos) return;
-    // lo que ya está en la base + lo que se marcó en pantalla sin guardar
-    setEstados((prev) => ({ ...Object.fromEntries(datos.previa.map((p) => [p.nino_id, p.estado])), ...prev }));
-  }, [datos]);
+  const [cambios, setCambios] = useState({});
+  const marcar = (ninoId, estado) => setCambios((prev) => ({ ...prev, [ninoId]: estado }));
 
   if (!datos) return <Estado cargando={cargando} error={error} recargar={recargar} />;
   const { bloque, ninos, previa, anterior, cerrado, suspension } = datos;
+  const estados = { ...Object.fromEntries(previa.map((p) => [p.nino_id, p.estado])), ...cambios };
   if (!bloque) return <Texto style={{ padding: 20 }}>No se encontró el bloque.</Texto>;
 
   const esAdmin = usuario?.rol === 'admin';
@@ -137,7 +134,7 @@ export default function PanelAsistencia({ bloqueId, navigation }) {
                 return (
                   <TouchableOpacity key={op} activeOpacity={0.8} disabled={soloLectura}
                     style={[estilos.opcion, activo && { backgroundColor: op === 'Presente' ? colores.verdeClaro : colores.rojoClaro, borderColor: color }, soloLectura && { opacity: 0.6 }]}
-                    onPress={() => setEstados({ ...estados, [n.id]: op })}>
+                    onPress={() => marcar(n.id, op)}>
                     <Feather name={op === 'Presente' ? 'check' : 'x'} size={15} color={activo ? color : colores.textoSuave} />
                     <Texto style={[estilos.opcionTexto, activo && { color }]}>{op}</Texto>
                   </TouchableOpacity>

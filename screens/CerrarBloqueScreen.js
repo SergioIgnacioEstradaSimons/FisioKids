@@ -1,6 +1,6 @@
 import { View, ScrollView, Alert, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useBase } from '../supabase';
 import Texto from '../components/Texto';
 import Boton from '../components/Boton';
 import Estado from '../components/Estado';
@@ -27,7 +27,7 @@ function Contador({ valor, etiqueta, icono, color, fondo }) {
 // Revisión final antes de cerrar el bloque. No se puede confirmar mientras queden niños sin asistencia:
 // hay que marcarlos o registrarlos como falta.
 export default function CerrarBloqueScreen({ navigation, route }) {
-  const db = useSQLiteContext();
+  const db = useBase();
   const { usuario } = useSesion();
   const id = route.params?.bloqueId;
   const fecha = hoyISO();

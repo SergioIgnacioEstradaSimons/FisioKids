@@ -1,5 +1,6 @@
 import { createContext, useContext } from 'react';
 import { createNavigationContainerRef } from '@react-navigation/native';
+import { supabase } from './supabase';
 
 // Guarda el usuario que inició sesión para que cualquier pantalla lo lea.
 export const SesionContext = createContext({ usuario: null, setUsuario: () => {} });
@@ -9,6 +10,7 @@ export const useSesion = () => useContext(SesionContext);
 export const navRef = createNavigationContainerRef();
 export function irALogin() {
   if (navRef.isReady()) navRef.reset({ index: 0, routes: [{ name: 'Login' }] });
+  supabase.auth.signOut();
 }
 
 // Pequeño sistema de eventos: cuando se leen avisos se actualiza el puntito de la campana y el menú

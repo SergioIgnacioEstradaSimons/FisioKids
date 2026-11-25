@@ -2,7 +2,7 @@
   "expo": {
     "name": "FisioKids",
     "slug": "fisiokids",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -17,10 +17,7 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "package": "com.grupo12.fisiokids",
-      "versionCode": 1,
-      "permissions": [
-        "android.permission.RECORD_AUDIO"
-      ]
+      "versionCode": 2
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -33,12 +30,8 @@
           "photosPermission": "FisioKids necesita acceder a tus fotos para elegir la foto de perfil.",
           "cameraPermission": "FisioKids usa la cámara para tomar tu foto de perfil."
         }
-      ]
-    ],
-    "extra": {
-      "eas": {
-        "projectId": "714d6fdd-660e-4ce0-b0be-d53cc04f3415"
-      }
-    }
+      ],
+      "expo-sharing"
+    ]
   }
 }

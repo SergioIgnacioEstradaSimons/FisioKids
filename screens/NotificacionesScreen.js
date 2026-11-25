@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { View, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useBase } from '../supabase';
 import Texto from '../components/Texto';
 import Estado from '../components/Estado';
 import { colores, tarjeta } from '../tema';
@@ -13,12 +13,13 @@ import { hoyISO, horaActual } from '../utiles';
 const TINTES = {
   azul: [colores.azulClaro, colores.azul], verde: [colores.verdeClaro, colores.exito],
   naranja: [colores.naranjaClaro, colores.alerta], morado: [colores.moradoClaro, colores.morado],
+  rojo: [colores.rojoClaro, colores.error],
 };
 
-// Avisos del centro, calculados con los datos reales: cada bloque cuyo horario ya pasó aparece como aviso
-// (pendiente de cerrar o finalizado) y también las suspensiones próximas. El profesional ve solo sus bloques.
+// Avisos del centro, calculados con los datos reales: bloques pasados (sin asistencia, sin cerrar o finalizados),
+// suspensiones próximas y eventos persistentes (perfil, contraseña y asignaciones). El profesional ve solo lo suyo.
 export default function NotificacionesScreen({ navigation }) {
-  const db = useSQLiteContext();
+  const db = useBase();
   const { usuario } = useSesion();
   const [pestana, setPestana] = useState('todas');
   const { datos, cargando, error, recargar } = useConsulta(async (d) => ({
@@ -87,7 +88,7 @@ export default function NotificacionesScreen({ navigation }) {
       {visibles.length === 0 ? (
         <View style={{ alignItems: 'center', marginTop: 40 }}>
           <Feather name="bell-off" size={30} color={colores.textoSuave} />
-          <Texto style={estilos.vacio}>{pestana === 'todas' ? 'Todavía no hay avisos. Aparecerán cuando pase el horario de un bloque.' : 'No tienes avisos sin leer.'}</Texto>
+          <Texto style={estilos.vacio}>{pestana === 'todas' ? 'Todavía no hay avisos. Aparecerán al pasar el horario de un bloque, al programar una suspensión o al registrar cambios de asignaciones y perfil.' : 'No tienes avisos sin leer.'}</Texto>
         </View>
       ) : null}
     </ScrollView>

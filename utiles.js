@@ -100,3 +100,17 @@ export const sumarDiasISO = (iso, dias) => {
   const [a, m, d] = iso.split('-').map(Number);
   return aISO(new Date(a, m - 1, d + dias));
 };
+
+export function formatoHace(valor) {
+  if (!valor) return 'Hoy';
+  const fecha = new Date(valor);
+  if (Number.isNaN(fecha.getTime())) return 'Hoy';
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const dia = new Date(fecha);
+  dia.setHours(0, 0, 0, 0);
+  const dias = Math.round((hoy.getTime() - dia.getTime()) / 86400000);
+  if (dias <= 0) return `Hoy ${String(fecha.getHours()).padStart(2, '0')}:${String(fecha.getMinutes()).padStart(2, '0')}`;
+  if (dias === 1) return 'Ayer';
+  return `${String(fecha.getDate()).padStart(2, '0')}/${String(fecha.getMonth() + 1).padStart(2, '0')}`;
+}

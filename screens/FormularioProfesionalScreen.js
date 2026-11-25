@@ -8,7 +8,7 @@ import Selector from '../components/Selector';
 import Boton from '../components/Boton';
 import SelectorFoto from '../components/SelectorFoto';
 import { colores } from '../tema';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useBase } from '../supabase';
 import Estado from '../components/Estado';
 import { useConsulta } from '../hooks';
 import { obtenerUsuario, correoExiste, usuarioConNombreExiste, agregarProfesional, modificarProfesional } from '../datos';
@@ -26,7 +26,7 @@ export default function FormularioProfesionalScreen(props) {
 }
 
 function Formulario({ navigation, existente }) {
-  const db = useSQLiteContext();
+  const db = useBase();
   const insets = useSafeAreaInsets();
   const [v, setV] = useState({
     foto: existente?.foto ?? null, // opcional
@@ -57,9 +57,8 @@ function Formulario({ navigation, existente }) {
     if (!correo) e.correo = 'El correo es obligatorio';
     else if (!/^\S+@\S+\.\S+$/.test(correo)) e.correo = 'El correo no tiene un formato válido';
     else if (await correoExiste(db, correo, existente?.id ?? 0)) e.correo = 'Ya existe un usuario con ese correo';
-    // En edición la contraseña es opcional (vacía = no cambiarla)
     if (!existente && !v.contrasena) e.contrasena = 'La contraseña es obligatoria';
-    else if (v.contrasena && v.contrasena.length < 6) e.contrasena = 'Mínimo 6 caracteres';
+    else if (!existente && v.contrasena.length < 6) e.contrasena = 'Mínimo 6 caracteres';
     return e;
   };
 
@@ -87,11 +86,15 @@ function Formulario({ navigation, existente }) {
 
         <Texto style={[estilos.seccion, { marginTop: 6 }]}>Acceso a la app</Texto>
         <Campo etiqueta="Correo electrónico" obligatorio icono="mail" value={v.correo} onChangeText={cambiar('correo')}
-          placeholder="correo@fisiokids.bo" keyboardType="email-address" autoCapitalize="none" error={errores.correo} />
-        <Campo etiqueta={existente ? 'Nueva contraseña (opcional)' : 'Contraseña'} obligatorio={!existente} icono="lock" value={v.contrasena}
-          onChangeText={cambiar('contrasena')} placeholder={existente ? 'Déjala vacía para no cambiarla' : 'Mínimo 6 caracteres'}
-          secureTextEntry={!ver} error={errores.contrasena}
-          derecha={<TouchableOpacity onPress={() => setVer(!ver)}><Feather name={ver ? 'eye-off' : 'eye'} size={18} color={colores.textoSuave} /></TouchableOpacity>} />
+          placeholder="correo@fisiokids.bo" keyboardType="email-address" autoCapitalize="none" error={errores.correo} soloLectura={Boolean(existente)} />
+        {existente ? (
+          <Texto style={estilos.nota}>Cada profesional cambia su contraseña desde Mi perfil.</Texto>
+        ) : (
+          <Campo etiqueta="Contraseña" obligatorio icono="lock" value={v.contrasena}
+            onChangeText={cambiar('contrasena')} placeholder="Mínimo 6 caracteres"
+            secureTextEntry={!ver} error={errores.contrasena}
+            derecha={<TouchableOpacity onPress={() => setVer(!ver)}><Feather name={ver ? 'eye-off' : 'eye'} size={18} color={colores.textoSuave} /></TouchableOpacity>} />
+        )}
 
         {existente ? (
           <Selector etiqueta="Estado" valor={v.activo} opciones={[{ valor: 1, etiqueta: 'Activo' }, { valor: 0, etiqueta: 'Inactivo (baja lógica)' }]} onChange={cambiar('activo')} />
@@ -108,5 +111,6 @@ function Formulario({ navigation, existente }) {
 
 const estilos = StyleSheet.create({
   seccion: { fontSize: 15, fontWeight: '700', color: colores.marino, marginBottom: 12 },
+  nota: { fontSize: 11, color: colores.textoSuave, marginBottom: 14 },
   barra: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, paddingTop: 12, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: colores.borde },
 });

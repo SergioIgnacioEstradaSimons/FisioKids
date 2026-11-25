@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, ScrollView, Alert, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useBase } from '../supabase';
 import Campo from '../components/Campo';
 import Boton from '../components/Boton';
 import SelectorFecha from '../components/SelectorFecha';
@@ -12,7 +12,7 @@ import { hoyISO, limpiar } from '../utiles';
 
 // Suspensión manual de un día (por ejemplo, un día sin atención que no es feriado nacional)
 export default function FormularioSuspensionScreen({ navigation }) {
-  const db = useSQLiteContext();
+  const db = useBase();
   const insets = useSafeAreaInsets();
   const [fecha, setFecha] = useState(null); // AAAA-MM-DD, se elige en el calendario
   const [motivo, setMotivo] = useState('');

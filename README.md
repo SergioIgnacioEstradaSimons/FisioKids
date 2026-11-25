@@ -8,46 +8,63 @@ Proyecto final de **Aplicaciones Móviles I** · Universidad Privada Domingo Sav
 
 ## ¿Qué problema resuelve?
 
-En los centros de fisioterapia infantil, los horarios, la asignación de profesionales y salas, el control de asistencia y el registro de actividades suelen llevarse en anotaciones separadas. Eso dificulta consultar la información a tiempo, provoca errores de programación y complica el historial de cada niño. FisioKids centraliza todo desde el celular del personal.
+En los centros de fisioterapia infantil, los horarios, la asignación de profesionales y salas, el control de asistencia y el registro de actividades suelen llevarse en anotaciones separadas. FisioKids centraliza todo desde el celular del personal.
 
 **Usuarios:** administrador del centro y profesionales de fisioterapia.
 
 ## Funcionalidades
 
 **Administrador**
-- Niños: crear, ver, editar, dar de baja y eliminar, sin duplicados (nombres, apellidos y fecha de nacimiento).
+
+- Niños: crear, ver, editar, dar de baja y eliminar, sin duplicados.
 - Profesionales y salas: crear, editar y dar de baja.
-- Calendario por turnos (mañana 8:00–12:00 y tarde 14:00–19:00) con asignación de varios niños por bloque (máximo 4) y control de conflictos de sala, profesional y cupo.
-- Resumen del día con las sesiones ya dadas y el detalle de cada una.
-- Gestión mensual: resumen de periodos anteriores, configuración y revisión.
-- Suspensiones: los feriados de Bolivia se consultan a una API y se guardan en el celular; también se pueden agregar suspensiones manuales con un calendario.
-- Historial de sesiones del centro.
+- Calendario por turnos (mañana 8:00–12:00 y tarde 14:00–19:00) con asignación de varios niños por bloque y control de conflictos de sala, profesional y cupo.
+- Edición de bloques existentes y aviso al profesional afectado.
+- Resumen del día, gestión mensual e historial de sesiones del centro.
+- Suspensiones: feriados de Bolivia consultados desde una API y suspensiones manuales.
+- Notificaciones: bloques pasados de horario sin asistencia, bloques sin cerrar, suspensiones dentro de los próximos 5 días y cambios de perfil/contraseña de profesionales.
 
 **Profesional**
+
 - Resumen de su jornada y agenda diaria.
-- Asistencia por bloques en orden: no se puede dar asistencia de un horario si el anterior sigue abierto.
-- Registro de atención por niño (actividades y observaciones).
+- Asistencia por bloques en orden y registro de atención por niño.
 - Cierre de bloque con confirmación; un bloque cerrado solo lo reabre el administrador.
 - Historial de atención de cada niño e historial mensual de sus sesiones.
+- Notificaciones: bloques pasados de horario sin asistencia, nuevas asignaciones, edición de sus bloques y suspensiones dentro de los próximos 5 días.
 
 **Ambos roles**
-- Ingreso con contraseña cifrada (SHA-256), perfil editable y cambio de contraseña.
+
+- Ingreso con Supabase Auth, perfil editable y cambio de contraseña.
 
 ## Tecnologías
 
-- React Native 0.88 con Expo SDK 58 (JavaScript)
+- React Native con Expo SDK 58 (JavaScript)
 - React Navigation: Stack, Bottom Tabs y Drawer
-- SQLite local con `expo-sqlite`
-- API pública [Nager.Date](https://date.nager.at) (feriados), consumida con `fetch`
-- `expo-crypto`, `expo-linear-gradient`, `react-native-svg`, `@expo/vector-icons`
-- Fuente Plus Jakarta Sans (`@expo-google-fonts/plus-jakarta-sans`)
+- Supabase: Auth, PostgreSQL, RLS, vistas y funciones RPC
+- API pública [Nager.Date](https://date.nager.at) para feriados de Bolivia
+- `expo-linear-gradient`, `react-native-svg`, `@expo/vector-icons` y Plus Jakarta Sans
 
-## Cómo funciona con la API y la base de datos
+## Configuración de Supabase
 
-- **Base de datos (SQLite):** guarda usuarios, niños, salas, bloques, asignaciones, asistencias, cierres de bloque y suspensiones. Todas las sentencias SQL están en `datos.js`, siempre con parámetros `?`. La base se crea sola la primera vez, con datos de ejemplo.
-- **API de feriados:** `GET https://date.nager.at/api/v3/PublicHolidays/{año}/BO`. Muestra tres estados: cargando, error con botón *Reintentar* y datos.
-- **Integración:** la API trae el catálogo de feriados y el administrador elige cuáles suspenden la atención; esos días se guardan en SQLite. Un día suspendido no tiene sesiones ni permite tomar asistencia.
-- **Sin internet:** solo la consulta de feriados necesita conexión. El resto de la app funciona sin conexión.
+1. Copia `env.example` como `.env.local`.
+2. Completa:
+
+```bash
+EXPO_PUBLIC_SUPABASE_URL=https://TU-PROYECTO.supabase.co
+EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
+```
+
+La clave publishable es pública y puede estar en la app. La clave secreta (`sb_secret_...`) nunca se sube al repositorio; solo se usa localmente en el script de importación.
+
+En Supabase > SQL Editor ejecuta, en este orden:
+
+1. `supabase/01_esquema.sql` — esquema, RLS y funciones base.
+2. `supabase/02_datos_iniciales.sql` — datos semilla.
+3. `supabase/03_seguridad.sql` — GRANT explícitos y reparación de `auth_id`.
+4. `supabase/04_vistas_rpc.sql` — vistas y funciones que consume `datos.js`.
+5. `supabase/05_eventos.sql` — tabla `eventos` para avisos persistentes.
+
+Después crea los usuarios en Authentication y verifica con la guía completa en `supabase/GUIA.md`.
 
 ## Cuentas de prueba
 
@@ -56,55 +73,58 @@ En los centros de fisioterapia infantil, los horarios, la asignación de profesi
 | Administrador | `admin@fisiokids.bo` | `admin123` |
 | Profesional | `carmen@fisiokids.bo` | `prof123` |
 | Profesional | `pablo@fisiokids.bo` | `prof123` |
-
-Son datos de ejemplo. Las contraseñas se guardan cifradas en la base.
+| Profesional | `laura@fisiokids.bo` | `prof123` |
+| Profesional inactivo | `jose@fisiokids.bo` | `prof123` |
 
 ## Instalación y ejecución
 
-Requisitos: Node.js, y la app **Expo Go** en el celular (o un emulador Android).
+Requisitos: Node.js y Expo Go en el celular o un emulador Android.
 
 ```bash
 npm install
-npx expo install expo-linear-gradient expo-font react-native-svg @expo/vector-icons @expo-google-fonts/plus-jakarta-sans expo-sqlite expo-crypto
+cp env.example .env.local
 npx expo start
 ```
 
-Escanea el código QR con Expo Go. Si cambias las tablas durante el desarrollo, borra los datos de Expo Go (o desinstala la app) para que la base se cree de nuevo.
+Si cambias `.env.local`, reinicia con `npx expo start -c`.
+
+Verificación:
+
+```bash
+npx expo lint
+npx expo export --platform android
+```
+
+## Importar datos reales
+
+La pantalla temporal **Exportar datos** genera un JSON con las tablas anteriores de SQLite. Desde la PC:
+
+```bash
+node scripts/importar-sqlite.js ruta/al/export.json
+```
+
+El script necesita `SUPABASE_URL` y `SUPABASE_SECRET_KEY` en `.env.local`. Hace upsert por `id`, vincula usuarios por correo y reajusta secuencias. La documentación detallada está en `supabase/GUIA.md`.
 
 ## Estructura del proyecto
 
-```
+```text
 FISIOKIDS/
-├── App.js            ← navegación (Stack + Tabs + Drawer) y SQLiteProvider
-├── datos.js          ← esquema y TODAS las sentencias SQL
-├── api.js            ← llamadas fetch a la API de feriados
-├── semilla.js        ← datos de ejemplo que se cargan una sola vez
-├── utiles.js         ← fechas, turnos y funciones de apoyo
-├── hooks.js          ← useConsulta: lee de SQLite al mostrar cada pantalla
-├── sesion.js         ← usuario que inició sesión
-├── tema.js           ← colores y estilos comunes
-├── components/       ← tarjetas, formularios, calendario, menú lateral…
-└── screens/          ← pantallas de la app
+├── App.js              ← navegación y rutas
+├── supabase.js         ← cliente de Supabase
+├── datos.js            ← acceso a datos, vistas, RPC y avisos
+├── hooks.js            ← hooks de consulta y notificaciones
+├── sesion.js           ← sesión y permisos por rol
+├── utiles.js           ← fechas, turnos y formato de avisos
+├── api.js              ← feriados desde Nager.Date
+├── env.example         ← plantilla de variables de entorno
+├── supabase/           ← SQL de esquema, datos, seguridad y guía
+├── scripts/            ← importación de datos reales
+├── components/         ← componentes compartidos
+└── screens/            ← pantallas de la app
 ```
-
-## Descargar la APK
-
-[Descargar FisioKids 1.0.0 (APK)](https://github.com/SergioIgnacioEstradaSimons/FisioKids/releases/download/v1.0.0/FisioKids-1.0.0.apk)
-
-- **Versión:** 1.0.0
-- **Tamaño:** 103 MB
-- **SHA-256:** `d9211c04b866d17e23ffa6a170565adb52baf35b8247ce73f40a5990975ab4d7`
-
-Para verificar la descarga:
-- Windows: `certutil -hashfile app.apk SHA256`
-- Linux/Mac: `sha256sum app.apk`
-
-## Video demo
-
-[Ver el video de demostración](ENLACE_DE_YOUTUBE)
 
 ## Autor
 
-- Sergio Ignacio Estrada Simóns · [Repositorio en GitHub](https://github.com/SergioIgnacioEstradaSimons/FisioKids)
+Sergio Ignacio Estrada Simóns · [Repositorio en GitHub](https://github.com/SergioIgnacioEstradaSimons/FisioKids)
 
 Docente: Ing. Juan Huanto Villca · Aplicaciones Móviles I · Tarija, 2026.

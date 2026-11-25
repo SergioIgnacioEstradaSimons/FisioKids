@@ -5,12 +5,11 @@ import Texto from '../components/Texto';
 import Campo from '../components/Campo';
 import Boton from '../components/Boton';
 import { colores, tarjeta } from '../tema';
-import { useSQLiteContext } from 'expo-sqlite';
-import { iniciarSesion } from '../datos';
+import { useBase } from '../supabase';
 import { useSesion } from '../sesion';
 
 export default function LoginScreen({ navigation }) {
-  const db = useSQLiteContext();
+  const db = useBase();
   const { setUsuario } = useSesion();
   const [rol, setRol] = useState('admin');
   const [correo, setCorreo] = useState('');
@@ -30,18 +29,30 @@ export default function LoginScreen({ navigation }) {
     if (!contrasena) e.contrasena = 'Ingresa tu contraseña';
     else if (contrasena.length < 6) e.contrasena = 'Mínimo 6 caracteres';
     if (Object.keys(e).length === 0) {
-      // Jornada 3: se valida con una consulta a la tabla usuarios (la contraseña se compara cifrada)
       try {
-        const u = await iniciarSesion(db, correo, contrasena);
-        if (!u) e.general = 'Correo o contraseña incorrectos';
-        else {
-          setUsuario(u);
-          setErrores({});
-          navigation.replace('Principal', { rol: u.rol });
-          return;
+        const { error: errorAuth } = await db.auth.signInWithPassword({
+          email: correo.trim().toLowerCase(),
+          password: contrasena,
+        });
+        if (errorAuth) {
+          e.general = errorAuth.message.includes('Email not confirmed')
+            ? 'Confirma tu correo para poder ingresar.'
+            : 'Correo o contraseña incorrectos';
+        } else {
+          const { data: { user } } = await db.auth.getUser();
+          const { data: perfil } = await db.from('v_usuarios').select('*').eq('auth_id', user.id).maybeSingle();
+          if (!perfil?.activo) {
+            await db.auth.signOut();
+            e.general = 'Tu usuario está inactivo. Contacta al administrador.';
+          } else {
+            setUsuario(perfil);
+            setErrores({});
+            navigation.replace('Principal', { rol: perfil.rol });
+            return;
+          }
         }
       } catch (err) {
-        e.general = 'No se pudo consultar la base de datos';
+        e.general = 'No se pudo iniciar sesión';
       }
     }
     setErrores(e);

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { View, Modal, TouchableWithoutFeedback, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import Texto from './Texto';
 import Campo from './Campo';
@@ -7,10 +7,14 @@ import { colores } from '../tema';
 
 // Ventana para escribir un texto corto (por ejemplo, un nuevo tipo de discapacidad).
 // onGuardar(texto) puede devolver un mensaje de error (string) o nada si todo salió bien.
-export default function ModalTexto({ visible, titulo, etiqueta, valorInicial = '', placeholder, textoBoton = 'Guardar', onGuardar, onCerrar }) {
+export default function ModalTexto({ visible, ...props }) {
+  if (!visible) return null;
+  return <ModalTextoVisible visible {...props} />;
+}
+
+function ModalTextoVisible({ visible, titulo, etiqueta, valorInicial = '', placeholder, textoBoton = 'Guardar', onGuardar, onCerrar }) {
   const [texto, setTexto] = useState(valorInicial);
   const [error, setError] = useState(null);
-  useEffect(() => { if (visible) { setTexto(valorInicial); setError(null); } }, [visible, valorInicial]);
 
   const guardar = async () => {
     const mensaje = await onGuardar(texto);

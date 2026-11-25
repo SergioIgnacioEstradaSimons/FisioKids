@@ -1,12 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { StatusBar } from 'expo-status-bar';
-import { SQLiteProvider } from 'expo-sqlite';
-import { NOMBRE_BASE, iniciarBase } from './datos';
+import { supabase } from './supabase';
 import { Feather } from '@expo/vector-icons';
 import {
   useFonts, PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold,
@@ -19,7 +18,6 @@ import { crearCabecera } from './components/Cabecera';
 import MenuLateral from './components/MenuLateral';
 import Texto from './components/Texto';
 
-import SplashScreen from './screens/SplashScreen';
 import LoginScreen from './screens/LoginScreen';
 import InicioAdminScreen from './screens/InicioAdminScreen';
 import InicioScreen from './screens/InicioScreen';
@@ -42,6 +40,7 @@ import AsistenciaScreen from './screens/AsistenciaScreen';
 import DetalleNinoScreen from './screens/DetalleNinoScreen';
 import FormularioNinoScreen from './screens/FormularioNinoScreen';
 import DetalleBloqueScreen from './screens/DetalleBloqueScreen';
+import FormularioBloqueScreen from './screens/FormularioBloqueScreen';
 import AsistenciaBloqueScreen from './screens/AsistenciaBloqueScreen';
 import NuevaAsignacionScreen from './screens/NuevaAsignacionScreen';
 import ConfigurarMesScreen from './screens/ConfigurarMesScreen';
@@ -53,6 +52,7 @@ import FormularioSuspensionScreen from './screens/FormularioSuspensionScreen';
 import EditarPerfilScreen from './screens/EditarPerfilScreen';
 import FormularioProfesionalScreen from './screens/FormularioProfesionalScreen';
 import FormularioSalaScreen from './screens/FormularioSalaScreen';
+import ExportarScreen from './screens/ExportarScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -130,19 +130,43 @@ function Principal() {
 
 export default function App() {
   const [usuario, setUsuario] = useState(null);
+  const [verificando, setVerificando] = useState(true);
   const [cargada] = useFonts({
     PlusJakartaSans_400Regular, PlusJakartaSans_500Medium, PlusJakartaSans_600SemiBold,
     PlusJakartaSans_700Bold, PlusJakartaSans_800ExtraBold,
   });
-  if (!cargada) return <View style={{ flex: 1, backgroundColor: colores.fondo }} />;
+
+  useEffect(() => {
+    let activo = true;
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (evento, sesion) => {
+      if (evento === 'SIGNED_OUT') {
+        if (activo) setUsuario(null);
+        if (navRef.isReady()) navRef.reset({ index: 0, routes: [{ name: 'Login' }] });
+        return;
+      }
+      if (!sesion?.user) return;
+      const { data: perfil } = await supabase.from('v_usuarios').select('*').eq('auth_id', sesion.user.id).maybeSingle();
+      if (activo && perfil) setUsuario(perfil);
+    });
+
+    supabase.auth.getSession().then(async ({ data }) => {
+      if (data.session) {
+        const { data: perfil } = await supabase.from('v_usuarios').select('*').eq('auth_id', data.session.user.id).maybeSingle();
+        if (activo) setUsuario(perfil);
+      }
+      if (activo) setVerificando(false);
+    });
+
+    return () => { activo = false; subscription.unsubscribe(); };
+  }, []);
+
+  if (!cargada || verificando) return <View style={{ flex: 1, backgroundColor: colores.fondo }} />;
 
   return (
-    <SQLiteProvider databaseName={NOMBRE_BASE} onInit={iniciarBase}>
     <SesionContext.Provider value={{ usuario, setUsuario }}>
       <NavigationContainer ref={navRef}>
         <StatusBar style="dark" />
-        <Stack.Navigator initialRouteName="Splash" screenOptions={{ header: crearCabecera(false), contentStyle: { backgroundColor: colores.fondo } }}>
-          <Stack.Screen name="Splash" component={SplashScreen} options={{ headerShown: false }} />
+        <Stack.Navigator initialRouteName={usuario ? 'Principal' : 'Login'} screenOptions={{ header: crearCabecera(false), contentStyle: { backgroundColor: colores.fondo } }}>
           <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
           <Stack.Screen name="Principal" component={Principal} options={{ headerShown: false }} />
           <Stack.Screen name="DetalleNino" component={DetalleNinoScreen} options={({ route }) => ({ title: route.params?.nombre ?? 'Ficha del niño' })} />
@@ -150,6 +174,7 @@ export default function App() {
           <Stack.Screen name="FormularioProfesional" component={FormularioProfesionalScreen} options={({ route }) => ({ title: route.params?.profesionalId ? 'Editar profesional' : 'Registrar profesional' })} />
           <Stack.Screen name="FormularioSala" component={FormularioSalaScreen} options={({ route }) => ({ title: route.params?.salaId ? 'Editar sala' : 'Registrar sala' })} />
           <Stack.Screen name="DetalleBloque" component={DetalleBloqueScreen} options={{ title: 'Detalle de bloque' }} />
+          <Stack.Screen name="FormularioBloque" component={FormularioBloqueScreen} options={{ title: 'Editar bloque' }} />
           <Stack.Screen name="AsistenciaBloque" component={AsistenciaBloqueScreen} options={{ title: 'Tomar asistencia' }} />
           <Stack.Screen name="NuevaAsignacion" component={NuevaAsignacionScreen} options={{ title: 'Nueva asignación' }} />
           <Stack.Screen name="ConfigurarMes" component={ConfigurarMesScreen} options={{ title: 'Configurar mes' }} />
@@ -162,9 +187,9 @@ export default function App() {
           <Stack.Screen name="HistorialAtencion" component={HistorialAtencionScreen} options={{ title: 'Historial de atención' }} />
           <Stack.Screen name="CambiarContrasena" component={CambiarContrasenaScreen} options={{ title: 'Cambiar contraseña' }} />
           <Stack.Screen name="RevisionMes" component={RevisionMesScreen} options={{ title: 'Revisión mensual' }} />
+          {__DEV__ ? <Stack.Screen name="Exportar" component={ExportarScreen} options={{ title: 'Exportar datos' }} /> : null}
         </Stack.Navigator>
       </NavigationContainer>
     </SesionContext.Provider>
-    </SQLiteProvider>
   );
 }
