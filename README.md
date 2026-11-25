@@ -69,7 +69,7 @@ npx expo install expo-linear-gradient expo-font react-native-svg @expo/vector-ic
 npx expo start
 ```
 
-Escanea el código QR con Expo Go. Si cambias las tablas durante el desarrollo, borra los datos de Expo Go (o desinstala la app) para que la base se cree de nuevo.
+Escanea el código QR con Expo Go. Funciones en datos requerimiento de internet
 
 ## Estructura del proyecto
 
