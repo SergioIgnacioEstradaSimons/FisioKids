@@ -6,12 +6,14 @@ import Estado from '../components/Estado';
 import TarjetaNino from '../components/TarjetaNino';
 import { colores, degradadoTarjeta } from '../tema';
 import { useConsulta } from '../hooks';
+import { useSesion } from '../sesion';
 import { obtenerBloque, obtenerNinosDeBloque } from '../datos';
 import { NOMBRES_DIA } from '../utiles';
 
 // Recibe el bloque por parámetros: route.params.bloqueId
 export default function DetalleBloqueScreen({ navigation, route }) {
   const id = route.params?.bloqueId;
+  const { usuario } = useSesion();
   const { datos, cargando, error, recargar } = useConsulta(async (db) => ({
     bloque: await obtenerBloque(db, id),
     ninos: await obtenerNinosDeBloque(db, id),
@@ -37,6 +39,10 @@ export default function DetalleBloqueScreen({ navigation, route }) {
 
       <Boton texto="Tomar asistencia" icono="check-square" style={{ marginTop: 6 }}
         onPress={() => navigation.navigate('AsistenciaBloque', { bloqueId: bloque.id })} />
+      {usuario?.rol === 'admin' ? (
+        <Boton texto="Editar bloque" icono="edit-2" variante="secundario" style={{ marginTop: 6 }}
+          onPress={() => navigation.navigate('FormularioBloque', { bloqueId: bloque.id })} />
+      ) : null}
     </ScrollView>
   );
 }

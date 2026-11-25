@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { View, ScrollView, TouchableOpacity, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useBase } from '../supabase';
 import Texto from '../components/Texto';
 import Chip from '../components/Chip';
 import Boton from '../components/Boton';
@@ -17,10 +17,10 @@ const DIAS = ['Domingo', ...NOMBRES_DIA.slice(1), 'Sábado'];
 const diaDe = (iso) => { const [a, m, d] = iso.split('-').map(Number); return DIAS[new Date(a, m - 1, d).getDay()]; };
 
 // Suspensiones. Patrón A (catálogo + guardados): la API trae el catálogo de feriados de Bolivia y el
-// administrador guarda en SQLite los que suspenden la atención. Los tres estados de la API:
+// administrador guarda en Supabase los que suspenden la atención. Los tres estados de la API:
 // cargando, error (con «Reintentar») y datos.
 export default function FeriadosScreen({ navigation }) {
-  const db = useSQLiteContext();
+  const db = useBase();
   const anioActual = new Date().getFullYear();
   const [anio, setAnio] = useState(anioActual);
   const [estado, setEstado] = useState('cargando'); // 'cargando' | 'error' | 'datos'

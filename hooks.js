@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useBase } from './supabase';
 import { obtenerAvisos, obtenerClavesLeidas } from './datos';
 import { hoyISO, horaActual } from './utiles';
 import { alCambiarAvisos } from './sesion';
 
-// Ejecuta una consulta a SQLite cada vez que la pantalla se muestra (así se refresca después de
+// Ejecuta una consulta a Supabase cada vez que la pantalla se muestra (así se refresca después de
 // agregar, modificar o eliminar y volver atrás). Devuelve { datos, cargando, error, recargar }.
 export function useConsulta(consulta, deps = [], inicial = null) {
-  const db = useSQLiteContext();
+  const db = useBase();
   const [datos, setDatos] = useState(inicial);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
@@ -31,7 +31,7 @@ export function useConsulta(consulta, deps = [], inicial = null) {
 
 // Cantidad de avisos sin leer del usuario (se actualiza cada 30 s y cuando se leen avisos)
 export function useAvisosSinLeer(usuario) {
-  const db = useSQLiteContext();
+  const db = useBase();
   const [cantidad, setCantidad] = useState(0);
   const id = usuario?.id;
   const rol = usuario?.rol;

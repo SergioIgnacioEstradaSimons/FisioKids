@@ -2,17 +2,17 @@ import { useState } from 'react';
 import { View, ScrollView, TouchableOpacity, Alert, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useBase } from '../supabase';
 import Texto from '../components/Texto';
 import Campo from '../components/Campo';
 import Boton from '../components/Boton';
 import { colores } from '../tema';
 import { useSesion } from '../sesion';
-import { contrasenaCorrecta, modificarPerfil } from '../datos';
+import { contrasenaCorrecta, modificarPerfil, registrarEventoParaAdmins } from '../datos';
 
-// Cambio de contraseña: pide la actual, la nueva y su repetición. La nueva se guarda cifrada.
+// Cambio de contraseña: pide la actual, la nueva y su repetición. La nueva se guarda en Supabase Auth.
 export default function CambiarContrasenaScreen({ navigation }) {
-  const db = useSQLiteContext();
+  const db = useBase();
   const insets = useSafeAreaInsets();
   const { usuario } = useSesion();
   const [v, setV] = useState({ actual: '', nueva: '', repetida: '' });
@@ -31,7 +31,17 @@ export default function CambiarContrasenaScreen({ navigation }) {
     setErrores(e);
     if (Object.keys(e).length > 0) return;
     try {
-      await modificarPerfil(db, usuario.id, { nombres: usuario.nombres, apellidos: usuario.apellidos, contrasena: v.nueva }); // UPDATE usuarios ... WHERE id = ?
+      await modificarPerfil(db, usuario.id, { nombres: usuario.nombres, apellidos: usuario.apellidos, contrasena: v.nueva });
+      if (usuario.rol === 'profesional') {
+        await registrarEventoParaAdmins(db, {
+          actor: usuario,
+          tipo: 'password',
+          titulo: 'Profesional cambió su contraseña',
+          texto: `${usuario.nombres} ${usuario.apellidos} actualizó su contraseña de acceso.`,
+          icono: 'key',
+          tono: 'morado',
+        });
+      }
       Alert.alert('Contraseña actualizada', 'Usa la nueva contraseña la próxima vez que inicies sesión.', [{ text: 'Aceptar', onPress: () => navigation.goBack() }]);
     } catch (err) {
       Alert.alert('No se pudo guardar', err.message);

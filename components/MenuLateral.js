@@ -81,6 +81,13 @@ export default function MenuLateral({ navigation, state }) {
         })}
       </ScrollView>
 
+      {__DEV__ ? (
+        <TouchableOpacity style={estilos.item} onPress={() => { navigation.navigate('Exportar'); navigation.closeDrawer(); }} activeOpacity={0.8}>
+          <Feather name="download" size={18} color={colores.textoSuave} />
+          <Texto style={estilos.itemTexto}>Exportar datos</Texto>
+        </TouchableOpacity>
+      ) : null}
+
       <TouchableOpacity style={[estilos.salir, { paddingBottom: insets.bottom + 14 }]} onPress={cerrarSesion}>
         <Feather name="log-out" size={17} color={colores.error} />
         <Texto style={{ color: colores.error, fontWeight: '700', marginLeft: 10, fontSize: 13 }}>Cerrar sesión</Texto>

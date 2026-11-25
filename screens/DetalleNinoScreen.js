@@ -1,5 +1,5 @@
 import { View, ScrollView, Alert, StyleSheet } from 'react-native';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useBase } from '../supabase';
 import Texto from '../components/Texto';
 import Boton from '../components/Boton';
 import Insignia from '../components/Insignia';
@@ -22,7 +22,7 @@ function Fila({ etiqueta, valor }) {
 
 // Recibe el niño por parámetros: route.params.ninoId
 export default function DetalleNinoScreen({ navigation, route }) {
-  const db = useSQLiteContext();
+  const db = useBase();
   const { usuario } = useSesion();
   const id = route.params?.ninoId;
   const bloqueId = route.params?.bloqueId; // si llega, se muestra «Sesión de hoy» con el estado de la asistencia

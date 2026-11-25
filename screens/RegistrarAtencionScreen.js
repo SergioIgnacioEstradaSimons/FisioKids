@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, ScrollView, TouchableOpacity, Alert, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useBase } from '../supabase';
 import Texto from '../components/Texto';
 import Campo from '../components/Campo';
 import Boton from '../components/Boton';
@@ -32,7 +32,7 @@ export default function RegistrarAtencionScreen(props) {
 }
 
 function Formulario({ navigation, bloque, nino, asistencia, cerrado, fecha }) {
-  const db = useSQLiteContext();
+  const db = useBase();
   const { usuario } = useSesion();
   const insets = useSafeAreaInsets();
   const [actividades, setActividades] = useState(asistencia?.actividades ?? '');

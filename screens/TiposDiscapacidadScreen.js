@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, FlatList, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useBase } from '../supabase';
 import Texto from '../components/Texto';
 import Insignia from '../components/Insignia';
 import Estado from '../components/Estado';
@@ -14,7 +14,7 @@ import { limpiar } from '../utiles';
 
 // Tipos de discapacidad: el administrador puede agregar nuevos, renombrarlos, desactivarlos o borrar los que no se usan.
 export default function TiposDiscapacidadScreen() {
-  const db = useSQLiteContext();
+  const db = useBase();
   const { datos, cargando, error, recargar } = useConsulta((d) => obtenerTipos(d, false));
   const [modal, setModal] = useState(null); // null | { tipo } (tipo = null para uno nuevo)
 

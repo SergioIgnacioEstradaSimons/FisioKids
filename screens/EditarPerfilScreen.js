@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, ScrollView, Alert, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useBase } from '../supabase';
 import Texto from '../components/Texto';
 import Campo from '../components/Campo';
 import Boton from '../components/Boton';
@@ -10,7 +10,7 @@ import { colores } from '../tema';
 import { useSesion } from '../sesion';
 import { useConsulta } from '../hooks';
 import SelectorFoto from '../components/SelectorFoto';
-import { obtenerUsuario, usuarioConNombreExiste, modificarPerfil, modificarFoto } from '../datos';
+import { obtenerUsuario, usuarioConNombreExiste, modificarPerfil, modificarFoto, registrarEventoParaAdmins } from '../datos';
 import { limpiar } from '../utiles';
 
 const SOLO_LETRAS = /^[A-Za-zÁÉÍÓÚáéíóúÑñÜü ]+$/;
@@ -23,10 +23,9 @@ export default function EditarPerfilScreen(props) {
   return <Formulario {...props} actual={datos} />;
 }
 
-// Cada usuario puede cambiar sus nombres y apellidos (la contraseña tiene su propia pantalla). El correo y el rol NO se pueden cambiar aquí:
-// el correo solo lo modifica el administrador desde Profesionales → Editar profesional.
+// Cada usuario puede cambiar sus nombres y apellidos (la contraseña tiene su propia pantalla). El correo y el rol NO se pueden cambiar desde la app.
 function Formulario({ navigation, actual }) {
-  const db = useSQLiteContext();
+  const db = useBase();
   const insets = useSafeAreaInsets();
   const { usuario, setUsuario } = useSesion();
   const [v, setV] = useState({ nombres: actual.nombres, apellidos: actual.apellidos });
@@ -59,6 +58,16 @@ function Formulario({ navigation, actual }) {
       await modificarPerfil(db, actual.id, { nombres, apellidos, contrasena: '' }); // UPDATE usuarios ... WHERE id = ?
       await modificarFoto(db, actual.id, foto);                                     // UPDATE usuarios SET foto = ?
       setUsuario({ ...usuario, nombres, apellidos, nombre: `${nombres} ${apellidos}`, foto }); // el saludo y el menú se actualizan al instante
+      if (actual.rol === 'profesional') {
+        await registrarEventoParaAdmins(db, {
+          actor: usuario,
+          tipo: 'perfil',
+          titulo: 'Profesional actualizó su perfil',
+          texto: `${nombres} ${apellidos} actualizó sus datos personales.`,
+          icono: 'user-check',
+          tono: 'azul',
+        });
+      }
       Alert.alert('Perfil actualizado', 'Tus cambios se guardaron.', [{ text: 'Aceptar', onPress: () => navigation.goBack() }]);
     } catch (err) {
       Alert.alert('No se pudo guardar', err.message);

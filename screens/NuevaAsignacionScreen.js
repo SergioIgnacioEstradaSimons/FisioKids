@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { View, ScrollView, TouchableOpacity, Alert, StyleSheet } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useSQLiteContext } from 'expo-sqlite';
+import { useBase } from '../supabase';
 import Texto from '../components/Texto';
 import Selector, { SelectorModal } from '../components/Selector';
 import Boton from '../components/Boton';
@@ -10,7 +10,8 @@ import Estado from '../components/Estado';
 import { iniciales } from '../components/TarjetaNino';
 import { colores, tarjeta } from '../tema';
 import { useConsulta } from '../hooks';
-import { obtenerNinos, obtenerProfesionales, obtenerSalas, obtenerBloquesEnHorario, obtenerNinosDeBloque, crearAsignacion } from '../datos';
+import { useSesion } from '../sesion';
+import { obtenerNinos, obtenerProfesionales, obtenerSalas, obtenerBloquesEnHorario, obtenerNinosDeBloque, crearAsignacion, registrarEventoParaProfesional } from '../datos';
 import { NOMBRES_DIA, TURNOS, turnoDe } from '../utiles';
 
 const ACTIVIDADES = ['Terapia motriz', 'Estimulación temprana', 'Terapia individual', 'Terapia ocupacional'].map((a) => ({ valor: a, etiqueta: a }));
@@ -31,7 +32,8 @@ function Chequeo({ ok, titulo, texto }) {
 
 // Parámetros opcionales: dia (1-5) y hora (HH:MM) para precargar el formulario
 export default function NuevaAsignacionScreen({ navigation, route }) {
-  const db = useSQLiteContext();
+  const db = useBase();
+  const { usuario } = useSesion();
   const insets = useSafeAreaInsets();
   const [ninoIds, setNinoIds] = useState([]);   // varios niños a la vez (sin pasar el máximo del bloque)
   const [agregando, setAgregando] = useState(false);
@@ -90,7 +92,16 @@ export default function NuevaAsignacionScreen({ navigation, route }) {
     setErrores(e);
     if (Object.keys(e).length) return;
     try {
-      await crearAsignacion(db, { ninoIds, profesionalId: profId, salaId, dias, hora, actividad: delSala?.actividad ?? actividad });
+      const actividadFinal = delSala?.actividad ?? actividad;
+      await crearAsignacion(db, { ninoIds, profesionalId: profId, salaId, dias, hora, actividad: actividadFinal });
+      await registrarEventoParaProfesional(db, {
+        actor: usuario,
+        profesionalId: profId,
+        titulo: 'Nueva asignación',
+        texto: `Se te asignó ${actividadFinal} los ${nombresDias(dias)} a las ${hora} con ${ninoIds.length} ${ninoIds.length === 1 ? 'niño' : 'niños'}.`,
+        icono: 'calendar',
+        tono: 'azul',
+      });
       Alert.alert('Asignación guardada', `${ninoIds.length === 1 ? 'El niño quedó asignado' : `Los ${ninoIds.length} niños quedaron asignados`} y se repetirá todos los ${nombresDias(dias)} del mes.`, [{ text: 'Aceptar', onPress: () => navigation.goBack() }]);
     } catch (err) {
       Alert.alert('No se pudo asignar', err.message); // las reglas de negocio se validan en datos.js
