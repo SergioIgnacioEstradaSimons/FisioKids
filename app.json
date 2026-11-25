@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "FisioKids",
+    "slug": "fisiokids",
+    "version": "1.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "com.grupo12.fisiokids",
+      "versionCode": 5
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "FisioKids necesita acceder a tus fotos para elegir la foto de perfil.",
+          "cameraPermission": "FisioKids usa la cámara para tomar tu foto de perfil."
+        }
+      ],
+      "expo-sharing",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0F2F4A",
+          "image": "./assets/splash-icon-light.png",
+          "imageWidth": 200,
+          "resizeMode": "contain"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "714d6fdd-660e-4ce0-b0be-d53cc04f3415"
+      }
+    },
+    "owner": "sergioestrada555"
+  }
+}
