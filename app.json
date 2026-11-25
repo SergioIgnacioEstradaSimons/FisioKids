@@ -32,6 +32,12 @@
         }
       ],
       "expo-sharing"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "714d6fdd-660e-4ce0-b0be-d53cc04f3415"
+      }
+    },
+    "owner": "sergioestrada555"
   }
 }
